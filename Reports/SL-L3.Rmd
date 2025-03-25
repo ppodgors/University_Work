@@ -1,0 +1,480 @@
+---
+title: "Regularization and knockoffs"
+subtitle: "Statistical Learning"
+author: "Paulina Podgórska"
+date: "2023-06-16"
+output: pdf_document
+---
+
+# Ridge regression
+
+Ridge regression is a method of estimating coefficients of multiple-regression models. It is helpful in a situation where data is highly correlated. The ridge regression estimator is given by a formula: $$\hat{\beta} = argmin_{\beta\in\mathbb{R}^p} \left ( ||Y-Xb||^2 + \lambda ||b||^2\right ) = (X'X+\lambda I)^{-1}X'Y,$$ where $\lambda >0$.
+
+## Orthonormal design
+
+We will consider a orthonormal design $X'X = I$ and regression model $Y = X\beta+\epsilon,$ where $\epsilon \sim N(0,I_{n \times n})$ and the vector of coefficients $\beta_1 = ... = \beta_k = 3.5$ and $\beta_{k+1}=...=\beta_{950}=0$ with:
+
+1.  $k=20$,
+
+2.  $k=100$,
+
+3.  $k=200$.
+
+### Tuning parameter $\lambda$
+
+Our goal is to find a value of tuning parameter $\lambda$ for ridge regression, so as to minimize the mean square error of the estimator of $\beta$:
+
+$$E||\hat{\beta}-\beta||^2 = f(\lambda) =  \frac{\lambda^2}{(1+\lambda)^2} ||\beta||^2 + \frac{p\sigma^2}{(1+\lambda)^2}$$ To find the value of $\lambda$, the first derivative of the function must be zero. $$f'(\lambda) = 0 \Leftrightarrow \frac{2(\lambda ||\beta||^2 - p\sigma^2)}{(1+\lambda)^3} = 0$$ from which we can conclude that the value we are looking for is $$\lambda_0 = \frac{p\sigma^2}{||\beta||^2}.$$
+
+```{r echo=FALSE}
+library("knitr")
+p = 950
+n = 1000
+lam = 1
+beta_a = c(rep(3.5,20),rep(0,(950-20)))
+beta_b = c(rep(3.5,100),rep(0,(950-100)))
+beta_c = c(rep(3.5,200),rep(0,(950-200)))
+betas = rbind(beta_a,beta_b,beta_c)
+lam1 = p/sum(beta_a^2)
+lam2 = p/sum(beta_b^2)
+lam3 = p/sum(beta_c^2)
+lams = c(lam1,lam2,lam3)
+df1 = data.frame(cbind(lam1,lam2,lam3))
+colnames(df1) =c("$\\lambda_1$","$\\lambda_2$","$\\lambda_3$")
+kable(df1,caption="Value of $\\lambda$ for each model which minimizes MSE")
+```
+
+$$MSE = \frac{||\beta||^2\sigma^2p}{||\beta||^2+\sigma^2p}$$
+
+Now, we will calculate the bias and the variance of this optimal estimator.The formulas are as follows.
+
+### Bias
+
+$E(\hat{\beta_i}) - \beta_i = E\left ( (X'X+\lambda I)^{-1} X'Y \right )-\beta_i = E\left ( \frac{X'Y}{1+\lambda}\right )-\beta_i = E \left ( \frac{\beta_i+X'\epsilon}{1+\lambda}\right )-\beta_i = \frac{\beta_i}{1+\lambda}-\beta_i = -\beta_i\frac{\lambda}{1+\lambda} = \left( \frac{-\sigma^2p}{||\beta||^2\sigma^2p}\right)\beta_i$
+
+### Variance
+
+$Var(\hat{\beta_i}) = E(\hat{\beta_i^2})-E(\hat{\beta_i}) = E\left ( \left ( \frac{\beta_i+X\epsilon}{1+\lambda} \right )^2 \right ) - \frac{-\beta_i^2}{(1+\lambda)^2} = E \left ( \frac{\beta_i^2+2\beta_iX'\epsilon+(X'\epsilon)^2}{(1+\lambda)^2}\right ) = \frac{\sigma^2}{(1+\lambda)^2} = \frac{\sigma^2||\beta||^4}{(||\beta||^2+p\sigma^2)^2}$
+
+```{r echo=FALSE}
+bias = c(0,0,0)
+variance = c(0,0,0)
+MSE = c(0,0,0)
+for(i in 1:3){
+  #bias[i] = (-p/(sum(betas[i,]^2)*p))*3.5
+  variance[i] = 1/(1+lams[i])^2
+  #variance[i] = sum(betas[i,]^4)/(sum(betas[i,]^2)+p)^2
+  bias[i] = -3.5*(lams[i]/(1+lams[i]))
+  #MSE[i] = sum(betas[i,]^2)*p/(sum(betas[i,]^2)+p)
+  MSE[i] = (lams[i]^2*sum(betas[i,]^2)+p)/(1+lams[i])^2
+}
+df<-data.frame(cbind(bias,variance,MSE))
+df = round(df,2)
+colnames(df)<-c("Bias (for $\\beta_i = 3.5$)","Variance","MSE")
+rownames(df)<-c("k=20","k=100","k=200")
+kable(df, caption = "Theoretical values of parameters for our 3 models")
+#7.78, 2.65, 1.48
+```
+
+## Empirical results
+
+Our next step is to generate 200 replicates of the above model and analyze the data using ridge regression and OLS. We will compare empirical values of above parameters with the theoretical ones as well as with the corresponding parameters of OLS.
+
+```{r echo=FALSE}
+var =c(0.2013371, 0.5654272, 0.7397681)
+varLS = c(0.9993092, 0.9979854, 0.9997376)
+mse = c(194.3319, 553.2075, 720.1803)
+mseLS = c(949.5763, 948.1171, 949.7482)
+bias_35 = c(-2.6842175, -1.1893481, -0.5253778)
+bias35LS = c(-0.09805593, -0.04831220 ,-0.03940722)
+bias0 = c(0.04104884, -0.25387981, -0.09436270)
+bias0LS = c(0.02678165, 0.14391733, 0.10657085)
+k = c(20,100,200)
+df1 = cbind(k,var,varLS,mse,mseLS, bias_35, bias35LS, bias0, bias0LS)
+df1 = data.frame(df1)
+df1 = round(df1,3)
+colnames(df1) = c("k","$var_{RR}$", "$var_{LS}$","$MSE_{RR}$","$MSE_{LS}$","$bias_{RR}$ (3.5)", "$bias_{LS}$ (3.5)","$bias_{RR}$ (0)", "$bias_{LS}$ (0)")
+
+kable(df1, caption = "Empirical results for 3 models")
+```
+
+The variance and the bias of ridge regression estimators are very close to the theoretical ones. We observe the biggest difference between the values of variance -- our results obtained from generating data are quite higher than the ones calculated by hand. The reason for this might be the influence of noise. Comparing the values of bias for OLS estimators and RR estimators we can draw a conclusion that OLS method tends to overestimate the true value of $\beta$ whereas RR does the opposite -- the estimators have generally lower values than the true betas. We can also observe that number of zero elements in the vector of regression coefficients does not influence the MSE of OLS -- in all cases it's higher than RR.
+
+# MSE of different estimation methods
+
+We will generate the design matrix $X_{1000 \times 950}$ such that its elements are iid random variables from $N(0, \sigma = \frac{1}{\sqrt{n}})$. Then we will generate the vector of the response variable according to the models proposed in previous section.
+
+We will estimate the parameters of those models using:
+
+1.  The ridge regression with the tuning parameter $\lambda$ selected by minimizing the prediction error. We will use the following formula:
+
+    $$PE(\lambda) = RSS(\lambda) + 2\sigma^2 Tr(M),$$
+    where $M = X(X'X+\lambda I)^{-1}X'$.
+
+2.  LASSO with the tuning parameter $\lambda$ selected by minimizing PE:
+
+    $$PE(\lambda) = RSS(\lambda) + 2 \sigma^2 k,$$
+    where $k$ is the number of variables selected by LASSO.
+
+3. The ridge regression with $\lambda$ selected by 10 fold CV,
+
+4. LASSO with $\lambda$ selected by 10 fold CV,
+
+5. OLS,
+
+6. OLS within the model selected by mBIC2,
+
+7. OLS within the model selected by AIC.
+
+After repeating the above experiment 100 times we received below results for MSE of $\beta$ and $\mu = X\beta$.
+
+```{r echo=FALSE}
+ZAD2MSE<- data.frame(matrix(0, ncol = 7, nrow = 3))
+ZAD2XSE<- data.frame(matrix(0, ncol = 7, nrow = 3))
+
+ZAD2XSE[1,] =  c(173.7449 ,105.7033  , 171.7764, 99.81104, 938.8509,  196.0122,  187.4792)
+ZAD2XSE[2,] = c(398.4795 ,305.1277, 426.8485,306.21290 , 956.0228, 1092.8748,  366.2442)
+ZAD2XSE[3,] = c(518.2874 ,476.6738 ,704.7223,477.32977  ,947.4448, 2312.2768, 1373.8882)
+ZAD2MSE[1,] = c(203.0352, 112.4534, 201.1285,106.9562  , 18461.11 , 204.4673,  203.7963)
+ZAD2MSE[2,]=c(674.0014 ,455.3056,707.1265, 457.6159  , 19020.38 ,1217.0822 , 447.7806)
+ZAD2MSE[3,]=c( 1050.2636, 890.9981, 1271.1442,890.6774 ,18163.53, 2489.5772 ,1740.6846)
+ZAD2MSE = round(ZAD2MSE,2)
+ZAD2XSE = round(ZAD2XSE,2)
+colnames(ZAD2MSE) = c("$RR_{PE}$", "$LASSO_{PE}$","$RR_{CV}$", "$LASSO_{CV}$", "$OLS$", "$OLS_{mBIC2}$", "$OLS_{AIC}$")
+colnames(ZAD2XSE) = c("$RR_{PE}$", "$LASSO_{PE}$","$RR_{CV}$", "$LASSO_{CV}$", "$OLS$", "$OLS_{mBIC2}$", "$OLS_{AIC}$")
+
+rownames(ZAD2MSE) = c("k=20","k=100","k=200")
+rownames(ZAD2XSE) = c("k=20","k=100","k=200")
+kable(ZAD2MSE, caption = "$||\\hat{\\beta} - \\beta||^2$ for our 7 approaches")
+```
+
+```{r echo=FALSE}
+kable(ZAD2XSE, caption = "$||\\hat{X(\\beta} - \\beta)||^2$ for our 7 approaches")
+```
+
+First obvious conclusion is that in cases where there is a lot of coefficients with value of 0, OLS performs significantly worse. Mean square errors are even ten times higher than some other cases. We can also observe a trend where the MSE is higher when value of $k$ is greater. Overall the most satisfying results we achieved using LASSO -- 2nd and 4th option. In this case it is intuitive - LASSO produces a sparse model where only a portion of the predictors have non-zero coefficients. 
+
+# LASSO irrepresentability and identifiability condition
+
+In this section, let's consider the design matrix $X_{100\times 200}$ such that its elements are iid random vectors from $\frac{1}{n}N(0,\Sigma),$ where $\Sigma_{ii}=1$ and for $i \neq j$ $\Sigma_{ij}=0.7$. The vector of regression coefficients is generated in a following way: $\beta_1,...\beta_k = 20$ and $\beta_{k+1}=...=\beta_{200}=0$. 
+
+
+## Irrepresentability condition
+
+$$||X'_{\bar{I}} X_I(X'_IX_I)^{-1}S(\beta_1)||_{\infty}\leq 1,$$
+where $I = \{ i\in \{1,...p \}| \beta_i \neq 0\}$, $X_I = (X_i)_{i\in I}, X_{\bar{I}} = (X_i)_{i \notin I}$ and $S(\beta)$ represents the sign vector of $\beta$.
+
+The maximal $k$ for which this condition is satisfied is: $k_{IR}=2$. The obtained value for IR is: 0.9906526. We generated the response variable according to formula 
+$$Y = X\beta^{k_{IR}}$$
+and empirically found such $\lambda$ that LASSO could recover the sign of $\beta$: $\lambda = 0.09999052$. 
+
+## Identifiability condition
+
+The vector $\beta$ is said to be identifiable with respect to the $l_1$ norm if the following implication holds
+$$X\gamma = X\beta,$$
+  $$\gamma \neq \beta \Rightarrow ||\gamma||_1 > ||\beta||_1.$$
+  Maximal $k$ for which the LASSO identifiability condition is satisfied: $k_{ID} = 54.$ Next, we generated the response variable according to the formula 
+$$Y = X\beta^{k_{IR}}$$
+  and tried to find $\lambda$ such that LASSO can recover the sign of $\beta$. The value we achieved is: $\lambda = 0.7956665$.
+
+Last step is to generate the response variable according to the formula 
+$$Y = 100X\beta^{k_{ID}+1}$$
+  and check if there exists $\lambda$ which allows for separating zero and nonzero elements of $\beta$.
+After generating data again, we got $k_{ID} = 60$. The closest value of $\lambda$ which allows for separating zero an nonzero elements of $\beta$ we got is 914.7462.
+
+# realdata.Rdata
+
+Once again, we will use *realdata* data set to test our prediction methods. Our data set contains the expression levels of 3221 genes for 210 individuals, which we have split into a test and a train set. The test set comprises 30 randomly selected individuals. We then construct models using the ridge regression and LASSO. We select the parameter $\lambda$ with help of cross-validation. Let's compare the quality of our new models to the model selection criteria from the previous assignment.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+library(pracma)
+library(glmnet)
+load("C:/Users/pauli/Desktop/realdata.Rdata")
+abc = as.matrix(Realdata)
+colnames(abc) = c(1:ncol(abc))
+set.seed(1227)
+rows = sample(1:210, 30, replace=FALSE)
+all = 1:210
+tr = c()
+for(i in 1:210){
+  if(i %in% rows){
+    
+  }else{
+    tr = c(tr,i)
+  }
+}
+test=as.data.frame(abc[rows,])
+train = as.data.frame(abc[tr,]) 
+
+Y = train[,1]
+X = as.matrix(train[,-1])
+reg = lm(Y~X-1)
+LASScv <- cv.glmnet(X,Y, alpha=1, intercept=FALSE, standardize=FALSE)
+model1 = glmnet(X,Y, alpha=1, intercept=FALSE, standardize=FALSE, lambda = LASScv$lambda.min)
+RRcv <- cv.glmnet(X,Y, alpha=0, intercept=FALSE, standardize=FALSE)
+model2 = glmnet(X,Y, alpha=0, intercept=FALSE, standardize=FALSE, lambda = RRcv$lambda.min)
+var_sel = c(sum(coef(model1)!=0),sum(coef(model2)!=0),193, 194, 7, 6, 8)
+var = data.frame(rbind(var_sel))
+colnames(var) = c("LASSO","RR", "AIC","BIC","RIC","mBIC","mBIC2")
+rownames(var)=c("Number of variables")
+rmse_df = data.frame(cbind(sum((predict(model1, X)[,1] - test[,1])^2),sum((predict(model2, X)[,1] - test[,1])^2), 31.7597, 1.8156, 0.0638, 0.1101, 0.0082))
+colnames(rmse_df) = c("LASSO","RR","AIC","BIC","RIC","mBIC","mBIC2")
+rownames(rmse_df)=c("SE")
+```
+```{r echo=FALSE}
+kable(var, caption="Number of variables selected by criteria")
+```
+
+Now let's test the accuracy of our models predictions on the test set using square error.
+
+```{r echo=FALSE}
+kable(rmse_df, caption="SE")
+```
+
+The ridge regression selects all variables. It also got the highest square error among all models. On the other hand, comparing to other models, LASSO behaves the most strictly -- it selected only 4 variables. Our methods did not achieve the best results, but we have to keep in mind that the values achieved by criterions from previous assignment were calculated on a different training data, because the division is random.
+
+Now we will take a different approach. We will preselect 300 interesting explanatory variables with the largest marginal correlation with the response variable. Next, we add variables selected with mBIC2. In our case, mBIC2 criterion added 2 more variables. Then, we construct models using RR and LASSO. 
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+library(bigstep)
+korelacja = cor(Y, X)
+wybrane<-which(korelacja %in% sort(korelacja, decreasing = TRUE)[1:300])
+
+d = prepare_data(Y,X)
+m_mbic2 = fast_forward(d, crit = "mbic2", maxf = 300)
+m5 = c(6,49,52,60,118,981)
+for(i in length(m5)){
+  if(!(m5[i] %in% wybrane)){
+    wybrane = c(wybrane, m5[i])
+  }
+}
+
+X2  = train[,wybrane]
+#302 zmienne
+la.aq = cv.glmnet(as.matrix(X2) , Y, alpha=0, intercept=FALSE, standardize=FALSE)
+model = glmnet(as.matrix(X2) , Y, alpha=0, intercept=FALSE, standardize=FALSE, lambda=la.aq$lambda.min)
+# Lasso
+la.aq1 = cv.glmnet(as.matrix(X2) , Y, alpha=1, intercept=FALSE, standardize=FALSE)
+model1 = glmnet(as.matrix(X2) , Y ,  alpha=1, intercept=FALSE, standardize=FALSE, lambda=la.aq1$lambda.min)
+
+df3 = data.frame(cbind(sum((predict(model, as.matrix(test[,wybrane]))[,1] - test[,1])^2),sum((predict(model1, as.matrix(test[,wybrane]))[,1] - test[,1])^2)))
+df4 = data.frame(cbind(sum(coef(model)!=0), sum(coef(model1)!=0)))
+colnames(df3) = c("RR","LASSO" )
+colnames(df4) = c("RR","LASSO")
+kable(df3, caption = "SE for reduced models")
+```
+```{r echo=FALSE}
+kable(df4, caption="Number of variables selected by models on reduced data")
+```
+
+# $k_{ID}$ with a noisy response
+
+We will consider the same setup as in two sections before but this time we will work on
+$$Y = X\beta^{k_{ID}}+\epsilon,$$
+where $\epsilon \sim N(0,I)$.
+
+```{r eval=FALSE, include=FALSE}
+beta = c(rep(20, kid), rep(0, 200-kid))
+set.seed(122)
+y = X %*% beta + rnorm(100, 0 ,1)
+
+la.aq = cv.glmnet(X,y, alpha=1, intercept=FALSE)
+la.aq$lambda.min
+model=glmnet(X,y, alpha=1, intercept=FALSE, lambda=la.aq$lambda.min)
+beta_l = coef(model)[-1]
+td = sum(beta_l[1:k]>0)
+fd = sum(beta_l[(k+1):200]>0)
+mse_1 = mean((beta_l-beta)^2)
+
+```
+```{r echo=FALSE}
+df5 = data.frame(cbind(0.079822 ,31, 38, 142.004))
+colnames(df5) = c("$\\lambda$","TD","FD","MSE")
+kable(df5, caption = "Values of parameters for $\\lambda$ for which LASSO MSE is minimal")
+```
+
+## Adaptive LASSO
+
+Now we will run adaptive LASSO with weights $w_i = \frac{1}{|\beta_L| + 0.000001}$. Again, we will select the parameter $\lambda$ so as MSE is minimal. 
+
+```{r eval=FALSE, include=FALSE}
+p = 200
+W2<-1/(abs(beta_l)+0.000001);
+Xtemp<-sweep(X,2,W2,'*')
+
+la.aq = cv.glmnet(Xtemp,y,intercept=FALSE, alpha=1)
+model = glmnet(Xtemp,y, alpha=1, intercept=FALSE, lambda=la.aq$lambda.min)
+la.aq$lambda.min
+betahatad=coef(model)[-1] * W2;
+
+mean((betahatad-beta)^2)
+
+
+td = sum(betahatad[1:kid]>0)
+fd = sum(betahatad[(kid+1):200]>0)
+```
+```{r echo=FALSE}
+df6 = data.frame(cbind(0.079823 ,31, 38, 142.0043))
+colnames(df6) = c("$\\lambda$","TD","FD","MSE")
+kable(df6, caption = "Values of parameters for ad LASSO")
+```
+
+Values are the same.
+
+# Modification
+
+This time we generate a response
+$$Y = X\beta^{k_{ID}}+\epsilon,$$
+where $\epsilon \in N(0,I)$.
+
+```{r echo=FALSE}
+df6<- data.frame(cbind(0.001024,210.917,989.673,202.817))
+colnames(df6) = c("$\\lambda_{LASSO}$","$MSE_{LASSO}$","$\\lambda_{adLASSO}$","$MSE_{adLASSO}$")
+kable(df6, caption="MSE values for LASSO and adaptive LASSO")
+```
+
+## SLOPE
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.height=4, fig.width=5, fig.align='center'}
+library(SLOPE)
+library(MASS)
+library(lpSolve)
+library(Rcpp)
+n=100
+p=200
+sig = matrix(0.7, p, p)
+diag(sig) = 1
+X<- mvrnorm(n,rep(0,p), Sigma = sig)/n
+kid = 64
+beta = c(rep(20, kid), rep(0, 200-kid))
+set.seed(1222)
+y = X %*% beta + rnorm(100, 0 ,1)
+
+set_alpha = seq(from=0.001, to=1, by=0.01)
+
+wyniki = c()
+B<-SLOPE(X,y, alpha=0.2,intercept=FALSE, scale='none', solver='admm')
+for(i in 1:length(set_alpha)){
+  B = SLOPE(X,y, alpha=set_alpha[i],intercept=FALSE, solver='admm')
+  wyniki[i] = mean((coefficients(B)-beta)^2)
+}
+
+plot(set_alpha,wyniki,ylab="MSE",xlab="alpha",type="l",col = "dodgerblue3",main = "Dependence of alpha on MSE (Slope)")
+
+```
+
+We achieve minimal MSE = `r round(min(wyniki),3)` for $\alpha=$ `r set_alpha[which.min(wyniki)]`. SLOPE method seems to be the most optimal one. It performs significantly better than LASSO or adLASSO. 
+
+# Knockoffs
+
+In the last section of the report we will generate the design matrix $X_{100 \times 200}$ such that its elements are iid random vectors from $\frac{1}{n}N(0,\Sigma),$ where $\Sigma_{ii}=1$ and for $i \neq j$ $\Sigma_{ij} = 0.7$. The vector or the response variable is generated according to the model
+$$Y = X \beta + \epsilon,$$
+where $\epsilon \sim N(0,I)$, $\beta_1=...=\beta_k = 30$ and $\beta_{k+1}=...=\beta_{200}=0$, $k \in \{ 5,20 \}$. We will generate 200 replicates of the above model and analyze the data using knockoffs (point a) and multiple knockoffs with RR and LASSO (point b).
+
+```{r eval=FALSE, include=FALSE}
+library(MASS)
+library(glmnet)
+library(lpSolve)
+library(Rcpp)
+library(mvtnorm)
+library(knockoff)
+n = 100
+p = 200
+sigma = matrix(0.7, nrow = p, ncol = p)
+diag(sigma) = 1
+X = mvrnorm(n, mu = rep(0, p), Sigma = Sigma)/n
+# Creating knockoffs
+k = 5
+moc = c()
+FPD = c()
+TD = c()
+n = 100
+m = 200
+rep1=50;
+
+Powertot<-rep(0,rep1);
+
+rep2<-5;
+q=0.1;
+
+howm<-function(w,t)
+{return(length(which(w<=t)))}
+
+howm2<-function(w,t)
+{return(length(which(w>=t)))}
+
+
+powt = 1
+w<-rep(0,powt*m);
+w<-matrix(w,ncol=m);
+
+for(i in 1:50)
+{
+  X = mvrnorm(n, mu = rep(0, m), Sigma = Sigma)/n
+  Y = X %*% beta + rnorm(100, 0, 1)
+  for(j in 1:1)
+  {
+    Xn = mvrnorm(n, mu = rep(0, m), Sigma = Sigma)/n
+    cX = cbind(X,Xn,Xn,Xn,Xn,Xn)
+    obj1 = cv.glmnet(cX,Y, intercept = FALSE, alpha = 1);
+    s = coef(obj1, s='lambda.min')[2:(2*m+1)]
+    s1<-s[1:m];
+    s2<-s[(m+1):(2*m)]
+    w[j,] = abs(s1)-abs(s2)
+  }
+  
+  obj1<-ecdf(w);
+  u1<-knots(obj1);
+  u1<-sort(abs(u1));
+  
+  len<-length(u1);
+  fun1<-matrix(rep(0,powt*len),nrow=powt);
+  fun2<-matrix(rep(0,powt*len),nrow=powt);
+  
+  for (j in 1:powt)
+  {  
+    for (k1 in 1:len)
+    {
+      fun1[j,k1]=howm(w[j,],-u1[k1])
+    } 
+  }
+  
+  for (j in 1:powt)
+  {  
+    for (k1 in 1:len)
+    {
+      fun2[j,k1]=max(howm2(w[j,],u1[k1]),1)
+    } 
+  }
+  
+  q = 0.1
+  
+  fdr<-(fun1[1,]+1)/fun2[1,];
+  v2<-(which(fdr<=q));
+  
+  if (length(v2)>0)
+  { 
+    crit<-u1[min(v2)]
+    a1<-which(w[1,]>=crit)
+    la<-length(a1)
+    #TD[i]<-sum(abs(beta[a1])>0)
+    moc[i] = moc[i]+sum(a1<=k)/k
+
+    #FDP[i]<-(la-TD[i])/max(la,1)
+  }
+  else{
+    moc[i] = moc[i]
+  }
+  moc[i] = moc[i]/5
+}
+mean(moc)
+
+```
+Lets compare the power of our four methods.
+```{r echo=FALSE}
+p_wr = data.frame(cbind(0.884,0.208,0.912,0.228))
+colnames(p_wr) = c("$RR_a$","$LASSO_a$","$RR_b$","$LASSO_b$")
+kable(p_wr, caption="Power of our 4 methods")
+```
+
+Multiple knockoffs with the ridge regression performs the best with power of 91.2%.
