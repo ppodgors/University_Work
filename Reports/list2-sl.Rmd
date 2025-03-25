@@ -1,0 +1,438 @@
+---
+title: "List 2 - Prediction error and information criteria"
+subtitle: "Statistical learning"
+author: "Paulina Podgórska"
+output: pdf_document
+---
+
+Let us generate the design matrix $X_{n \times p}=X_{1000 \times 950}$ such that its elements are iid random variables from $N(0, \sigma=\frac{1}{\sqrt{1000}})$. Then, we generate the vector of values of the response variable $Y = X\beta+\epsilon,$ where $\beta= (3,3,3,3,3,0, \dots, 0)^T$ and $\epsilon \sim N(0,I)$.\
+We will perform analysis using 6 models containing only:
+
+-   the first 2 columns of $X$ ($p = 2$),
+
+-   the first 5 columns of $X$ ($p = 5$),
+
+-   the first 10 columns of $X$ ($p = 10$),
+
+-   the first 100 columns of $X$ ($p = 100$),
+
+-   the first 500 columns of $X$ ($p = 500$),
+
+-   all 950 columns ($p = 950$).
+
+We will start our data analysis with estimating $\beta$ with the Least Squares method and calculating the residual sum of squares: $$RSS = ||\hat{Y} - Y||^2 = \sum^{n}_{i=1}e_i^2$$.
+
+```{r echo=FALSE}
+library("knitr")
+library(ggplot2)
+library(bigstep)
+set.seed(1227)
+n= 1000
+X<- matrix(rnorm(1000*950,0, 1/sqrt(1000)),1000,950)
+beta<-c(rep(3,5), rep(0, 945))
+epsilon<- rnorm(1000)
+Y <- X%*%beta+epsilon
+p<- c(2,5,10,100,500,950)
+
+#a)
+mod <- list()
+betaest = list()
+rss = c()
+for(i in 1:6){
+  mod[[i]] = lm(Y~X[,1:p[i]]-1)
+  betaest[[i]] = coef(mod[[i]])
+  rss = c(rss, sum((predict(mod[[i]])-Y)^2))
+}
+rss_df = data.frame(rbind(round(rss,3)))
+colnames(rss_df) = c("$X_{2}$","$X_{5}$","$X_{10}$","$X_{100}$","$X_{500}$","$X_{950}$")
+rownames(rss_df)=c("RSS")
+kable(rss_df,caption="RSS of our 6 models")
+```
+
+The model with 2 variables has the highest RSS value. As the number of variables increases, the RSS decreases significantly. The RSS difference between the $X_2$ and the $X_{950}$ model is: `r round((rss[1]-rss[6]),2)`.
+
+```{r eval=FALSE, include=FALSE}
+Xb = X%*%matrix(beta,nrow=950)
+pe = c()
+pe2=c()
+epsilon2 =  matrix(rnorm(n,0,1),nrow =n)
+for(i in 1:6){
+  pe = c(pe,sum((Xb - fitted.values(mod[[i]])+epsilon2)^2))
+  #może jako error być nsigma^2
+  #pe2 = c(pe2, 1*(n+p[i]))
+}
+
+#pe_df<- data.frame("Ilość zmiennych" = p, "PE" = round(pe,3))
+pe_df <- data.frame(rbind(p,round(pe,3)))
+kable(pe_df)
+```
+
+# Prediction error
+
+The formula of the true expected value of the prediction error, conditional on the training sample is as follows: $$PE = E_{\epsilon^*}||X(\beta-\hat{\beta})+\epsilon^*||,$$ where $\epsilon^* \sim N(0,I)$ is a new noise vector, independent on the training sample.\
+
+## Prediction error estimation
+
+We can estimate the prediction error in three ways:
+
+1.  Using RSS with the true value of $\sigma$: $\widehat{PE}_1 = RSS+2\sigma^2p$, where p - number of variables in the model,
+
+2.  Using RSS with the regular unbiased estimator $\hat{\sigma}$: $\widehat{PE}_2 = RSS+2\hat{\sigma}^2p$, where $\hat{\sigma}^2= \frac{RSS}{n-p}$,
+
+3.  Using leave-one-out cross-validation:\
+    $CV=\sum^n_{i=1}(\frac{Y_i-\hat{Y_i}}{1-M_{ii}})$, where $M = X_k(X_k'X_k)^{-1} X_k', X_k=(X^{(1)}\cdots X^{(k)})$.
+
+```{r echo=FALSE}
+Xb = X%*%matrix(beta,nrow=950)
+pe = c()
+pe2=c()
+epsilon2 =  matrix(rnorm(n,0,1),nrow =n)
+for(i in 1:6){
+  pe = c(pe,sum((Xb - fitted.values(mod[[i]])+epsilon2)^2))
+  #może jako error być nsigma^2
+  #pe2 = c(pe2, 1*(n+p[i]))
+}
+pe_df<- data.frame("Ilość zmiennych" = p, "PE" = round(pe,3))
+PE_b = c()
+PE_b2 = c()
+#sigma^2 = RSS/(n-p)
+for(i in 1:6){
+  PE_b = c(PE_b, rss[i]+ 2*p[i])
+  PE_b2 = c(PE_b2, rss[i]+2*rss[i]/(n-p[i])*p[i])
+}
+#c 
+CV = c()
+for(i in 1:6){
+  Xtemp = X[,1:p[i]]
+  H=Xtemp%*%solve(t(Xtemp)%*%Xtemp)%*%t(Xtemp)
+  CV = c(CV,  sum( ((Y-predict(mod[[i]])) / (1-diag(H)) )^2))
+}
+
+#dane = data.frame(x=p,PE=pe,PE1=PE_b,PE2=PE_b2,CV=CV)
+#ggplot(dane,aes(x=x,y=CV))+geom_point()+geom_line(y=dane$PE1,colour=4)+geom_line(y=dane$PE2,colour=2)+geom_line(y=dane$CV,colour=3)+scale_x_log10(breaks=p)+ylab("Wartość")+xlab("Liczba zmiennych")->fig1
+dane = data.frame(rbind(pe,PE_b,PE_b2,CV))
+df1 = dane
+rownames(df1) = c("PE","$\\widehat{PE}_1$","$\\widehat{PE}_2$","CV")
+colnames(df1) = c("$X_{2}$","$X_{5}$","$X_{10}$","$X_{100}$","$X_{500}$","$X_{950}$")
+kable(df1, caption = "Prediction error estimation")
+```
+
+The estimator $\widehat{PE}_1$ determined using RSS with the true value of $\sigma$ has the values closest to the true expected values of PE. For a number of variables greater than 100, the CV estimator achieves much higher values compared to the others - for $X_{950}$ PE is over 10 times higher.
+
+The model is optimal when its prediction error is small. Thus, we can see that $X_5$ and $X_{10}$ are the best - they have the smallest prediction error (for each estimator). On the other hand, the model with 950 variables is significantly worse.
+
+## 100 repetitions
+
+To better test the differences between the true expected value of PE and its estimators, we will repeat above analysis 100 times and create boxplots of $\widehat{PE}-PE$ for each model.
+
+### $\widehat{PE_1}-PE$
+
+```{r echo=FALSE, fig.height=2.5,fig.width=5,message=FALSE, warning=FALSE,fig.align='center'}
+re = 100
+PE<- matrix(0,n=re,ncol=6)
+PE1<- matrix(0,n=re,ncol=6)
+PE2<- matrix(0,n=re,ncol=6)
+CV<- matrix(0,n=re,ncol=6)
+for(i in 1:re){
+  Y=X%*%beta+rnorm(n)
+  rss = c()
+  Xb = X%*%matrix(beta,nrow=950)
+  pe = c()
+  epsilon2 =  matrix(rnorm(n,0,1),nrow =n)
+  for(j in 1:6){
+    mod = lm(Y~X[,1:p[j]]-1)
+    rss = sum((predict(mod)-Y)^2)
+    PE[i,j] = sum((Xb - fitted.values(mod)+epsilon2)^2)
+    PE1[i,j] = rss + 2*p[j]
+    PE2[i,j] = rss + 2*p[j] * (rss/(n-p[j]))
+    Xtemp = X[,1:p[j]]
+    H=Xtemp%*%solve(t(Xtemp)%*%Xtemp)%*%t(Xtemp)
+    CV[i,j] = sum( ((Y-predict(mod)) / (1-diag(H)) )^2)
+  }
+}
+library("reshape2")
+df4<-data.frame(PE1-PE)
+p4 <- ggplot(data = melt(df4), aes(x=variable, y=value)) + geom_boxplot() +stat_boxplot(geom = "errorbar", width = 0.4)+ylab("Value")+xlab("Number of variables")+ scale_x_discrete(labels= p) 
+p4
+```
+
+For $\widehat{PE_1}-PE$ the interquartile range is similar for each of the models. The median value is close to 0 in each case. We can conclude from this that the difference between $\widehat{PE_1}$ and $PE$ is at a similar level, regardless of the number of variables in the model.
+
+### $\widehat{PE_2}-PE$
+
+```{r echo=FALSE, fig.height=2.5, fig.width=5, message=FALSE, warning=FALSE,fig.align='center'}
+df5<-data.frame(PE2-PE)
+p5 <- ggplot(data = melt(df5), aes(x=variable, y=value)) + geom_boxplot() +stat_boxplot(geom = "errorbar", width = 0.4) +ylab("Value")+xlab("Number of variables")+ scale_x_discrete(labels= p)
+p5
+```
+
+Based on the box plots, we can infer that for models with a number of variables $\leq$ 500, the $\widehat{PE_2}$ estimator performs similarly to $\widehat{PE_1}$. This conclusion is supported by the similar median, Q1 and Q3 values. In all cases, the predicted value of PE is not significantly different from the expected value of PE. However, for $X_{950}$, the  $\widehat{PE_2}$ estimator differs from PE, with a larger interquartile range and more extreme minimum and maximum values.
+
+### $CV-PE$
+
+```{r echo=FALSE, fig.height=3,fig.width = 5.5, message=FALSE, warning=FALSE,fig.align='center'}
+library("patchwork")
+df2<-data.frame(CV[,1:5]-PE[,1:5])
+p3 <- ggplot(data = melt(df2), aes(x=variable, y=value)) + geom_boxplot()+stat_boxplot(geom = "errorbar", width = 0.4) +ylab("Value")+xlab("Number of variables")+ scale_x_discrete(labels= p[1:5])
+df3<-data.frame(CV[,6]-PE[,6])
+p4 <- ggplot(data = melt(df3), aes(x=variable, y=value)) + geom_boxplot() + ylim(5000,22500)+stat_boxplot(geom = "errorbar", width = 0.4) +ylab("Value")+xlab("Number of variables")+ scale_x_discrete(labels= p[6])
+p3+p4+plot_layout(widths=c(3,1))
+```
+
+The CV estimator produces results that are significantly different from the expected values. In the case of 500 variables, the median of the difference is above 500, the IQR and the min and max values are large. With 950 variables, $CV-PE$ is very large, with a median close to 20 000. This estimation method performs the worst for models with a large number of variables. The boxplots confirm that the estimator that gives the results closest to the expected value is $\widehat{PE_1}$.
+
+# Model selection using AIC
+
+The AIC criterion is used to choose between models with different numbers of predictors. It is also an indicator of the fit of the model to the data. We will consider three versions of AIC:
+
+-   $AIC_1$ -- with known $\sigma$: we will choose a model that minimizes $RSS+2\sigma^2k$,
+
+-   $AIC_2$ -- with $\sigma$ estimated by the unbiased estimator $\hat{\sigma}$: we will choose a model that minimizes $RSS+2k\frac{RSS}{n-p}$,
+
+-   $AIC_3$ -- version for unknown $\sigma$: we will choose a model that minimizes $n \cdot log(RSS)+2k$.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+my_crit_sigma_known<- function(loglik,k,n){
+  n*exp(-2*loglik/n) + 2*k
+}
+
+my_crit_sigma_est<- function(loglik,k,n){
+  n*exp(-2*loglik/n)+2*((n*exp(-2*loglik/n))/(n-k))*k}
+  
+d = prepare_data(Y,X)
+wyn1 = fast_forward(d,crit="my_crit_sigma_est",maxf=200)
+a2= wyn1$model
+
+wyn2 = fast_forward(d,crit="my_crit_sigma_known",maxf=200)
+a1=wyn2$model
+
+wyn3 = fast_forward(d,crit="aic",maxf=200)
+a3=wyn3$model
+
+
+aic_df <- data.frame(rbind(c(length(a1),length(a2),length(a3))))
+colnames(aic_df)<-c("$AIC_1$","$AIC_2$","$AIC_3$")
+rownames(aic_df)<-c("Number of variables")
+kable(aic_df, caption = "The number of variables in the optimal model selected by three versions of AIC ")
+```
+
+## 100 repetitions
+
+Let us repeat above model selections 100 times in order to calculate the average number of false negatives and false positives produced by all three versions of AIC.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ile=100
+FPs_est = rep(0,ile)
+FPs_known = rep(0,ile)
+FPs_aic = rep(0,ile)
+FNs_est = rep(0,ile)
+FNs_known = rep(0,ile)
+FNs_aic = rep(0,ile)
+for(i in 1:ile){
+  epsilon<- rnorm(1000)
+  Y <- X%*%beta+epsilon
+  d = prepare_data(Y,X)
+  wyn1 = fast_forward(d,crit="my_crit_sigma_est",maxf=200)
+  a1= wyn1$model
+  FPs_est[i] = sum(as.integer(a1)>5)
+  FNs_est[i] = 5-sum(as.integer(a1)<=5)
+  wyn2 = fast_forward(d,crit="my_crit_sigma_known",maxf=200)
+  a2=wyn2$model
+  FPs_known[i] = sum(as.integer(a2)>5)
+  FNs_known[i] = 5-sum(as.integer(a2)<=5)
+  wyn3 = fast_forward(d,crit="aic",maxf=200)
+  a3=wyn3$model
+  FPs_aic[i] = sum(as.integer(a3)>5)
+  FNs_aic[i] = 5-sum(as.integer(a3)<=5)
+  
+}
+
+AICF_df = data.frame(rbind(c(mean(FPs_known),mean(FPs_est),mean(FPs_aic)),c(mean(FNs_known),mean(FNs_est),mean(FNs_aic))))
+colnames(AICF_df) = c("$AIC_1$","$AIC_2$","$AIC_3$")
+rownames(AICF_df) = c("False positives","False negatives")
+kable(AICF_df, caption = "Average number of false positives and false negatives for each method")
+```
+
+# BIC, AIC, RIC, mBIC, mBIC2
+
+Next, let's consider additional information criteria for selecting significant variables to include in the model.
+
+-   BIC -- we choose a model that minimizes $RSS+\sigma^2k log(n), n>8$,
+
+-   RIC -- we choose a model that minimizes $RSS+2k\sigma^2log(p)$,
+
+-   mBIC -- we choose a model that minimizes $log(RSS) + klog(n)+2klog(\frac{p}{c})$, where $c$ - average number of significant variables,
+
+-   mBIC2 -- we choose a model that minimizes $log(RSS)+klog(n)+2klog(\frac{p}{c})-2log(k!)$.
+
+We will perform analysis using 4 models containing: 20, 100, 500 and 950 first variables.
+
+## False and true discoveries, square error
+
+The square error of the estimation of the vector of expected values of $Y$: $$SE = ||X\beta-\hat{Y}||^2.$$ \newpage
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, cashe=TRUE, comment = NA}
+p = c(20,100,500,950)
+k=5
+cnames=c('Criterion','TD','FD', 'SE')
+rnames = c('AIC','BIC','RIC','mBIC','mBIC2')
+crit1 = c('aic', 'bic','ric','mbic','mbic2')
+temp = c(19,rep(sqrt(n),3) )
+for(i in 1:4){
+  d = prepare_data(Y,X[,1:p[i]])
+  name <- paste("m", p[i], sep = "")
+  mat = matrix(0, ncol = 3, nrow = 5)
+  Xb = X%*%beta
+  for(j in 1:5){
+    if(j==3){wyn = fast_forward(d,crit=crit1[j+1], const=temp[i])}else{wyn = fast_forward(d,crit=crit1[j])}
+    ind =sort(as.numeric(wyn$model))
+    betahat = rep(0,950)
+    betahat[as.numeric(wyn$model)] =summary(wyn)$coefficients[-1,1]
+    TD=sum(ind<=k)
+    FD=sum(ind>k)
+    SE = sum((X%*%betahat-Xb)^2)
+    mat[j,] = c(TD,FD,round(SE,2))
+  }
+  mat = data.frame(mat)
+  mat = cbind(rnames,mat)
+  colnames(mat) = cnames
+  assign(name, mat)
+  
+}
+kable(cbind(m20,m100),caption = "20 and 100 variables")
+kable(cbind(m500, m950),caption = "500 and 950 variables")
+```
+
+AIC resulted in a relatively high number of true and false discoveries. In contrast, mBIC and mBIC2 criteria achieved a lower number of false discoveries, but in the presence of a large number of variables, the number of true discoveries was limited and the square error of estimation was higher. In comparison, RIC achieved the smallest squared error value, with a good trade-off between true and false discoveries. Thus, the RIC criterion performed best.
+
+## 100 repetitions
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, cashe=TRUE}
+cnames=c('Criterion','TD','FD', 'SE')
+rnames = c('AIC','BIC','RIC','mBIC','mBIC2')
+crit1 = c('aic', 'bic','ric','mbic','mbic2')
+temp = c(19,rep(sqrt(n),3) )
+ile=100
+p = c(20,100,500,950)
+k=5
+m_all = list()
+for(i in 1:4){
+  m_all[[i]] = matrix(0, ncol = 5, nrow = 5)
+}
+for(rep in 1:ile){
+  Y=X%*%beta+rnorm(n)
+  for(i in 1:4){
+  d = prepare_data(Y,X[,1:p[i]])
+  Xb = X%*%beta
+  for(j in 1:5){
+    if(j==3){wyn = fast_forward(d,crit=crit1[j+1], const=temp[i])}else{wyn = fast_forward(d,crit=crit1[j])}
+    ind =sort(as.numeric(wyn$model))
+    betahat = rep(0,950)
+    betahat[as.numeric(wyn$model)] =summary(wyn)$coefficients[-1,1]
+    TD=sum(ind<=k)
+    FD=sum(ind>k)
+    Pow=TD/k
+    FDR=FD/max(length(ind),1)
+    SE = sum((X%*%betahat-Xb)^2)
+    m_all[[i]][j,] =  m_all[[i]][j,]+c(TD,FD,FDR,Pow,SE)
+  }
+}
+}
+```
+
+```{r echo=FALSE}
+cnames2=c('Criterion','TD','FD','FDR','Power', 'MSE')
+for(i in 1:4){
+  m_all[[i]] =m_all[[i]]/ile 
+  m_all[[i]] = round(data.frame(m_all[[i]]),3)
+  m_all[[i]] = cbind(rnames, m_all[[i]])
+  colnames(m_all[[i]]) = cnames2
+}
+kable(cbind(m_all[[1]],m_all[[2]]),caption = "20 and 100 variables")
+kable(cbind(m_all[[3]],m_all[[4]]),caption = "500 and 950 variables")
+
+```
+
+In terms of power, the AIC criterion outperforms all other criteria in all cases. However, it also yields a high rate of false discoveries and a large mean squared error. The BIC criterion comes in second in terms of power, with a large number of true discoveries and significantly fewer false discoveries. Other criteria show similar performance, particularly when the number of variables is small.
+
+To minimize false discoveries, the mBIC or mBIC2 criterion is the best choice, with the lowest false discovery rate at the cost of lower power. If the goal is to achieve the most optimal result, the BIC criterion performs well, with a high number of true discoveries and low standard error but relatively high false discovery rate. Lastly, if the goal is to identify as many true discoveries as possible, even at the cost of many false discoveries, the AIC criterion is the best choice.
+
+# realdata.Rdata
+
+We will test the AIC, BIC, RIC, mBIC, and mBIC2 criteria on real data. Our data set contains the expression levels of 3221 genes for 210 individuals, which we have split into a test and a train set. The test set comprises 30 randomly selected individuals. We then construct a regression model to explain the expression level of gene 1 as a function of the expression levels of other genes and use the mentioned criteria to select explanatory variables. Let us see how many variables were selected by each criterion.
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+load("C:/Users/pauli/Desktop/realdata.Rdata")
+abc = as.matrix(Realdata)
+colnames(abc) = c(1:ncol(abc))
+typeof(abc)
+rows = sample(1:210, 30, replace=FALSE)
+all = 1:210
+tr = c()
+for(i in 1:210){
+  if(i %in% rows){
+    
+  }else{
+    tr = c(tr,i)
+  }
+}
+test=as.data.frame(abc[rows,])
+train = as.data.frame(abc[tr,]) 
+
+Y = train[,1]
+X = as.matrix(train[,-1])
+```
+
+
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+d = prepare_data(Y,X)
+m_aic = fast_forward(d, crit = "aic", maxf = 300)
+m1 = get_model(m_aic)
+predict(m1, test[,-1])
+
+Yhat_aic = predict(m1, newdata = test[,-1])
+sum(Yhat_aic-test[,1])^2
+
+m_bic = fast_forward(d, crit = "bic", maxf = 300)
+m2 = get_model(m_bic)
+Yhat_bic = predict(m2, newdata = test[,-1])
+sum(Yhat_bic-test[,1])^2
+
+m_ric = fast_forward(d, crit = "mbic", maxf = 300, const = sqrt(30))
+m3 = get_model(m_ric)
+Yhat_ric = predict(m3, newdata = test[,-1])
+sum(Yhat_ric-test[,1])^2
+
+m_mbic = fast_forward(d, crit = "mbic", maxf = 300)
+m4 = get_model(m_mbic)
+Yhat_mbic = predict(m4, newdata = test[,-1])
+sum(Yhat_mbic-test[,1])^2
+
+m_mbic2 = fast_forward(d, crit = "mbic2", maxf = 300)
+m5 = get_model(m_mbic2)
+Yhat_mbic2 = predict(m5, newdata = test[,-1])
+sum(Yhat_mbic2-test[,1])^2
+
+RMSE3 = round(c(sum(Yhat_aic-test[,1])^2,sum(Yhat_bic-test[,1])^2,sum(Yhat_ric-test[,1])^2,sum(Yhat_mbic-test[,1])^2,sum(Yhat_mbic2-test[,1])^2),4)
+
+var_sel = c(length(m_aic$model),length(m_bic$model),length(m_ric$model),length(m_mbic$model),length(m_mbic2$model))
+var = data.frame(rbind(var_sel))
+colnames(var) = c("AIC","BIC","RIC","mBIC","mBIC2")
+rownames(var)=c("Number of variables")
+rmse_df = data.frame(rbind(RMSE3))
+colnames(rmse_df) = c("AIC","BIC","RIC","mBIC","mBIC2")
+rownames(rmse_df)=c("SE")
+```
+
+```{r echo=FALSE}
+kable(var, caption="Number of variables selected by criteria")
+```
+
+Now let's test the accuracy of our models predictions on the test set using square error.
+
+```{r echo=FALSE}
+kable(rmse_df, caption="SE")
+```
+
+Comparing different criteria for selecting explanatory variables, we see that AIC performs poorly. The Bayesian Information Criterion also does not yield satisfactory results. In contrast, RIC and mBIC show promise with smaller errors. However, mBIC2 criterion emerges as the most effective, delivering the best prediction accuracy among all the criteria tested.
