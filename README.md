@@ -1,6 +1,6 @@
 # University Work
 
-This repository contains reports, projects, and assignments from my Mathematics studies at the University of Wrocław.
+This repository contains reports and assignments from my Mathematics studies at the University of Wrocław.
 
 # Contents
 ## Reports
@@ -9,5 +9,5 @@ This repository contains reports, projects, and assignments from my Mathematics 
 * Topics include statistical modeling, hypothesis testing, multiple comparisons, and empirical processes.
 
 ## Assignments
-* Programming-based assignments written in Python
+* Programming-based assignments written in Python.
 * Focus on numerical methods, optimization, machine learning, and modeling.
