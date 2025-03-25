@@ -1,0 +1,394 @@
+---
+title: "Theoretical Foundations of Large Data Sets"
+subtitle: "List 2"
+author: "Paulina Podgórska"
+output: pdf_document
+---
+
+# Global testing for the expected value of the Poisson distribution (1)
+
+Let $X_1,..., X_n$ be the sample from the Poisson distribution. Let us consider the test for the hypothesis
+
+$$H_0: E(X_i) = 5 \hspace{0.5cm} vs \hspace{0.5cm} H_1: E(X_i)>5,$$ which rejects the null hypothesis for large values of $\bar{X} = \frac{1}{n}\sum\limits_{i=1}^nX_i$.Therefore out T-statistics $T = \bar{X}$.
+
+## P-value (a)
+
+We know that if $H_0$ is true, $\sum\limits_{i=1}^n X_i\sim Pois(n\lambda)$. With that, let us derive the formula for the p-value: $$p = P_{H_0}\left (\frac{1}{n}\sum\limits_{i=1}^nX_i>T\right) = 1-P_{H_0}\left(\frac{1}{n}\sum\limits_{i=1}^nX_i \leq T\right) = 1-P_{H_0}\left(\sum\limits_{i=1}^nX_i\leq nT\right) = 1-\Phi_{Pois(5n)}(nT).$$ We can see that $nT$ is the observed sum $\sum\limits_{i=1}^n X_i$. Therefore the function in R for calculating the p-value is as follows:
+
+```{r echo=TRUE}
+p_vals <- function(x){
+  return( 1-ppois(sum(x), 5*100))
+}
+```
+
+## Calculating p-values from simulation (b)
+
+Let us consider 1000 of the same hypothesis for $n=100$. From that simulation we will draw histogram of p-values and discuss their distribution.
+
+```{r echo=FALSE, fig.align='center', fig.height=4.5, fig.width=5.5}
+rep = 1000
+p = c()
+n = 100
+
+for(i in 1:rep){
+  x = rpois(n, 5)
+  p[i] = p_vals(x)
+}
+
+hist(p, probability = TRUE,col="snow2",border="snow4")
+abline(h=1, col = "red")
+```
+
+From the above histogram we can conclude that the distribution of the p-values is approximately uniform $U[0,1]$.
+
+## Bonferroni and Fisher tests of the global hypothesis (c)
+
+Now, let us consider the meta problem of testing the global hypothesis $H_0 = \bigcap\limits_{j=1}^{1000} H_{0j}$ and use the simulations to estimate the probability of type I error for the Bonferroni and Fisher tests at the significance level $\alpha=0.05$.
+
+**Fisher's Combination Test** rejects the null hypothesis when $T = -\sum\limits_{i=1}^n 2 log(p_i)$ is greater than $\chi_{2n}^2(1-\alpha)$.
+
+**Bonferroni's method** rejects the null hypothesis when $\underset{1\leq i\leq n}{min} p_i \leq \frac{\alpha}{n}$.
+
+```{r eval=FALSE, include=FALSE}
+alpha = 0.05
+n = 100
+err_B = c()
+err_F = c()
+for(k in 1:1000){
+  pvals = c()
+  for(i in 1:1000){
+    x = rpois(100,5)
+    pvals[i] = p_vals(x)
+  }
+  T_F = -sum(2*log(pvals))
+  err_F[k]= T_F>qchisq(1-alpha,2*1000)
+  err_B[k] = min(pvals)<=alpha/1000
+}
+mean(err_B)
+mean(err_F)
+```
+
+| Test       | P(Type I Error) |
+|------------|-----------------|
+| Bonferroni | 0.054           |
+| Fisher     | 0.166           |
+
+We observe that the probability of type I error for the Bonferroni test aligns closely with the specified significance level $\alpha = 0.05$. On the other hand the probability of type I error in Fisher's test is higher than $\alpha$. The reason for this difference might be that Fisher's test assumes that the test statistic follows a chi-squared distribution, a condition predicated on the p-values being uniformly distributed. As we saw in the previous task, our p-values only approximately follow a uniform distribution, which explains why the observed probability differs from the expected $\alpha$.
+
+## Power of our test for needle in the haystack and many small effect (d)
+
+Now let us use simulations to compare the power of the Bonferroni and Fisher tests for two alternatives:
+
+-   Needle in the haystack $$E(X_1) = 7 \hspace{0.2cm} \text{and} \hspace{0.2cm} E(X_j)=5 \hspace{0.2cm} \text{for} \hspace{0.2cm} j\in \{2,...,1000 \}$$
+
+```{r eval=FALSE, include=FALSE}
+n=1000
+pvals = c()
+errB = c()
+errF = c()
+alpha = 0.05
+for(k in 1:200){
+  pvals = c()
+  x1 = rpois(100, 7)
+  pvals = c(pvals,p_vals(x1))
+  for(i in 2:n){
+    xj = rpois(100, 5)
+    pvals =c(pvals,p_vals(xj))
+    
+  }
+  errB[k] = min(pvals)<=alpha/1000
+  errF[k] = ((-1)*sum(2*log(pvals)))>qchisq(1-alpha, 2*1000)
+}
+mean(errB)
+mean(errF)
+```
+
+| Test       | Power |
+|------------|-------|
+| Bonferroni | 1     |
+| Fisher     | 0.77  |
+
+In the needle in the haystack problem, Bonferroni's method outperforms Fisher's test with a power of 1, excelling at detecting a single strong signal. This showcases Bonferroni's ability in situations with one pronounced effect.
+
+-   Many small effects $$E(X_j) = 5.2 \hspace{0.2cm} \text{for} \hspace{0.2cm} j\in \{ 1, ...,100\} \hspace{0.2cm} \text{and} \hspace{0.2cm} \hspace{0.2cm} E(X_j)=5 \hspace{0.2cm} \text{for} \hspace{0.2cm} j\in\{101,...,1000\}.$$
+
+```{r eval=FALSE, include=FALSE}
+n=1000
+pvals = c()
+errB = c()
+errF = c()
+alfa = 0.05
+for(k in 1:500)
+{
+  pvals = c()
+  pvals = c(pvals,replicate(100,  p_vals(rpois(100, 5.2))))
+  pvals = c(pvals,replicate(900,  p_vals(rpois(100, 5))))
+  errB[k] = min(pvals)<=alfa/n
+  errF[k] = (-1)*sum(2*log(pvals))>qchisq(1-alfa, 2*n)
+}
+mean(errB)
+mean(errF)
+```
+
+| Test       | Power |
+|------------|-------|
+| Bonferroni | 0.202 |
+| Fisher     | 0.99  |
+
+In the case of many small effects, Fisher's test achieved almost the maximum power. Bonferroni is likely too conservative in this situation, which leads to a failure in detecting true positives.   
+
+# Function $R_n$ (2)
+
+Let $X_1,...,X_{100000}$ be iid random variables from $N(0,1)$. For $n\in \{2,...,100000\}$ let us plot 10 graphs of the function $$R_n = \frac{max\{X_i, i=1,...,n\}}{\sqrt{2logn}},$$ depending on the draw data.
+
+```{r echo=FALSE,fig.height=4.5}
+X = rnorm(100000)
+Rn_function<-function(n){
+  return(max(X[1:n])/sqrt(2*log(n)))
+}
+Rn<-sapply(2:20000, Rn_function)
+plot(2:20000, Rn, xlab = "n", ylab="Rn", type="l",ylim = c(-0.5,1))
+colors = terrain.colors(10)
+for(i in 2:10){
+  X = rnorm(100000)
+  Rn_function<-function(n){return(max(X[1:n])/sqrt(2*log(n)))}
+  Rn<-sapply(2:20000, Rn_function)
+  lines(2:20000, Rn,col = colors[i])
+}
+```
+
+# The optimal Neyman - Pearson test (3)
+
+Let $Y = (Y_1,...,Y_n)$ be the random vector from $N(\mu, I)$ distribution. For the classical needle in the haystack problem: $H_0: \mu =0$ vs $H_1:$ one of the elements of $\mu$ is equal to $\gamma$, consider the statistics $L$ of the optimal Neyman-Pearson test $$L = \frac{1}{n} \sum\limits_{i=1}^n e^{\gamma Y_i - \gamma^2/2}$$ and its approximation $$\tilde{L} = \frac{1}{n}\sum\limits_{i=1}^n\left [ e^{\gamma Y_i-\gamma^2} \mathbf{1}_{\{ Y_i < \sqrt{2logn}\}}\right ].$$ For $\gamma = (1-\epsilon)\sqrt{2logn}$ with $\epsilon = 0.1$ and $n\in \{ 1000,10000, 100000\}$. We will use 1000 replicates.
+
+```{r echo=FALSE}
+n = c(1000,10000,100000)
+eps = 0.1
+L = matrix(0, nrow = 1000, ncol=3)
+Lt = matrix(0, nrow = 1000, ncol=3)
+c3 = matrix(0, nrow = 1000, ncol=3)
+for(rep in 1:1000){
+  for(i in 1:3){
+   Y = rnorm(n[i])
+   gamma = (1-eps)*sqrt(2*log(n[i]))
+   L[rep,i] = 1/n[i]*sum(exp(gamma*Y - gamma^2/2))
+   Lt[rep,i] = 1/n[i]*sum(exp(gamma*Y - gamma^2/2)*(Y<sqrt(2*log(n[i]))))
+   c3[rep,i] =(L[rep,i]==Lt[rep,i])
+  }
+}
+```
+
+## Histograms of $L$ and $\tilde{L}$ (a)
+
+First, let's look at the histograms of $L$ depending on the value of $n$.
+
+```{r echo=FALSE, fig.height=3}
+par(mfrow=c(1,3))
+hist(L[,1], main = "n = 1000", xlab = "L",col="snow2",border="snow4")
+hist(L[,2], main = "n = 10000", xlab = "L",col="snow2",border="snow4")
+hist(L[,3], main = "n = 100000", xlab = "L",col="snow2",border="snow4")
+```
+
+We do not observe significant differences between the histograms. It indicates that the value of $n$ does not have a clear impact on the value of $L$. It is evident that the vast majority of $L$ values are small.
+
+Now, let's see histograms for $\tilde{L}$.
+
+```{r echo=FALSE, fig.height=3}
+par(mfrow=c(1,3))
+hist(Lt[,1], main = "n = 1000", xlab = "L_tilde",col="snow2",border="snow4")
+hist(Lt, main = "n = 10000", xlab = "L_tilde",col="snow2",border="snow4")
+hist(Lt[,3], main = "n = 100000", xlab = "L_tilde",col="snow2",border="snow4")
+```
+
+In this instance, we observe that the data is less spread. We can see that the values of $\tilde{L}$ range between 0 and 2. Again, we cannot determine a clear influence between $n$ and the value of our statistic.
+
+## Variances of $L$ and $\tilde{L}$ under null hypothesis (b)
+
+Using our simulations lets calculate the variances of $L$ $\tilde{L}$.
+
+```{r echo=FALSE}
+library(knitr)
+df1 = data.frame("n" = c(1000,10000,100000), "L" = round(c(var(L[,1]), var(L[,2]),var(L[,3])),3), "Lt" = round(c(var(Lt[,1]), var(Lt[,2]),var(Lt[,3])),3))
+colnames(df1) = c("n", "var(L)", "var($\\tilde{L}$)")
+kable(df1)
+```
+
+We observe that the variance of $\tilde{L}$ is significantly lower. We can also notice that with the increase of $n$ the variance decreases. In case of $L$, the variances don't seem to be affected by the value of $n$ -- we record the highest variance for $n = 10000$.
+
+## Estimation of $P_{H_0}(L=\tilde{L})$ (c)
+
+```{r echo=FALSE}
+df2 = data.frame("n" = c(1000,10000,100000), "P(L=Lt)" = round(colMeans(c3),3))
+colnames(df2) = c("n", "$P(L=\\tilde{L})$")
+kable(df2)
+```
+
+We can compare the calculated probabilities to the theoretical ones. From the lecture we know, that the probability $P(L\neq \tilde{L})$ approaches 0 as $n \rightarrow \infty$:
+
+$$P(L\neq\tilde{L})\leq P(\underset{q\leq i \leq n}{max}y_i \geq T_n)\leq \sum\limits_{i=1}^nP(y_I\geq T_n) \leq\sum\limits_{i=1}^n\frac{1}{T_n}\frac{1}{2\pi}e^{-\frac{T_n^2}{2}}=\frac{1}{\sqrt{2\pi}}\frac{n\cdot\frac{1}{n}}{Tn}\underset{n \rightarrow \infty}{\rightarrow}0.$$ From this, we can conclude that the probability $P(L=\tilde{L}) = 1-0 = 1$. It is evident that as $n$ increases, our calculated probability gets closer to the theoretical one.
+
+# Critical value of the optimal Neyman-Pearson test (4)
+
+In this section we will use simulations to find the critical value of the optimal Neyman-Pearson test and compare the power of this test and the Bonferroni test for the "needle in the haystack" problem with $n\in \{ 500,5000,50000\}$ and the needle $\gamma = (1+\epsilon)\sqrt{2logn}$ with $\epsilon \in \{0.05, 0.2\}$.
+
+```{r echo=FALSE}
+alpha = 0.05
+n = c(500, 5000, 50000)
+epsilon = c(0.05, 0.2)
+
+L = matrix(0, nrow=6, ncol=1000)
+for(i in 1:1000){
+  j = 1
+  for(n1 in c(1,2,3)){
+    for(e1 in c(1,2)){
+      Y = rnorm(n[n1], 0, 1)
+      gamma = (1+ epsilon[e1])*sqrt(2*log(n[n1]))
+      L[j,i] = 1/n[n1] * sum(exp(gamma*Y - gamma^2/2))
+      j = j +1
+    }
+  }
+}
+
+c_vals = rep(0,6)
+eps1 = c()
+eps2 = c()
+for(i in 1:6){
+  if(i%%2 != 0){
+    eps1 = c(eps1, quantile(log(L[i,]), 0.95))
+  }else{
+    eps2 = c(eps2, quantile(log(L[i,]), 0.95))
+  }}
+```
+
+The calculated critical values *c*:
+
+-   $\epsilon = 0.05$
+
+```{r echo=FALSE}
+df3 = data.frame("n" = n, "c" = round(eps1,3))
+kable(df3)
+```
+-   $\epsilon = 0.05$
+```{r echo=FALSE}
+df4 = data.frame("n" = n, "c" = round(eps2,3))
+kable(df4)
+```
+
+We observe that for both values of $\epsilon$, the critical values decrease as $n$ increases. This indicates that with larger sample sizes, our tests become more strict in rejecting the null hypothesis which makes it less likely to incorrectly reject the null hypothesis. We can also observe a relation between the critical value $c$ and the value of $\epsilon$ -- with $\epsilon=0.2$ we achieve significantly lower critical value.
+
+Now, let us compare the ower of the Bonferroni test ad the optimal Neyman-Pearson test.
+
+
+```{r echo=FALSE}
+rep = 1000
+eps = 0.05
+
+L = matrix(0, nrow = rep, ncol = 3)
+for(i in 1:rep){
+  for(n1 in c(1,2,3)){
+    gamma = (1+eps)*sqrt(2*log(n[n1]))
+    Y = rnorm(n[n1])
+    L[i,n1] = 1/n[n1]*sum(exp(gamma*Y-gamma^2/2))
+  }
+}
+
+q = c(quantile(log(L[,1]),0.95),quantile(log(L[,2]),0.95),quantile(log(L[,3]),0.95))
+L1 = matrix(0, nrow = rep, ncol = 3)
+pwrB = matrix(0, nrow = rep, ncol = 3)
+pwrNP = matrix(0, nrow = rep, ncol = 3)
+for(i in 1:rep){
+  for(n1 in 1:3){
+    gamma = (1+eps)*sqrt(2*log(n[n1]))
+    Y1 = c(rnorm(1,gamma,1), rnorm(n-1))
+    L1[i,n1] = log(1/n[n1]*sum(exp(gamma*Y1-gamma^2/2)))
+    pwrB[i,n1] = max(abs(Y1))>=abs(qnorm(alpha/(2*n[n1])))
+    pwrNP[i,n1] = L1[i,n1]>q[n1]
+  }
+}
+```
+-   $\epsilon = 0.05$
+
+```{r echo=FALSE}
+df5= data.frame("n" = n, "Pwr_B" = colMeans(pwrB), "pwrNP" = colMeans(pwrNP))
+colnames(df5) = c("n", "Power Bonf.", "Power N-P")
+kable(df5)
+```
+
+-   $\epsilon = 0.2$
+
+```{r echo=FALSE}
+rep = 1000
+eps = 0.2
+
+L = matrix(0, nrow = rep, ncol = 3)
+# epsilon = 0.05
+for(i in 1:rep){
+  for(n1 in c(1,2,3)){
+    gamma = (1+eps)*sqrt(2*log(n[n1]))
+    Y = rnorm(n[n1])
+    L[i,n1] = 1/n[n1]*sum(exp(gamma*Y-gamma^2/2))
+  }
+}
+
+q = c(quantile(log(L[,1]),0.95),quantile(log(L[,2]),0.95),quantile(log(L[,3]),0.95))
+L1 = matrix(0, nrow = rep, ncol = 3)
+pwrB = matrix(0, nrow = rep, ncol = 3)
+pwrNP = matrix(0, nrow = rep, ncol = 3)
+for(i in 1:rep){
+  for(n1 in 1:3){
+    gamma = (1+eps)*sqrt(2*log(n[n1]))
+    Y1 = c(rnorm(1,gamma,1), rnorm(n-1))
+    L1[i,n1] = log(1/n[n1]*sum(exp(gamma*Y1-gamma^2/2)))
+    pwrB[i,n1] = max(abs(Y1))>=abs(qnorm(alpha/(2*n[n1])))
+    pwrNP[i,n1] = L1[i,n1]>q[n1]
+  }
+}
+```
+
+```{r echo=FALSE}
+df6= data.frame("n" = n, "Pwr_B" = colMeans(pwrB), "pwrNP" = colMeans(pwrNP))
+colnames(df6) = c("n", "Power Bonf.", "Power N-P")
+kable(df6)
+```
+
+In every examined scenario, the Neyman-Pearson test consistently achieves the highest power, with the observed difference being approximately 0.05. Across both values of$\epsilon$, we notice the that the power of tests increases with the growth of $n$. As the size of the needle increases (bigger $\epsilon$), it's easier to find it. Correspondingly, as expected, a larger sample size leads to improved outcomes, even achieving a power of 0.8.
+
+# Comparison of the distributions (5)
+
+Let us draw one graph with cdfs of the standard normal distribution and the Student's distribution with degrees of freedom $df \in \{1,3,5,10,50,100\}$.
+
+```{r echo=FALSE}
+x = seq(-5,5,length.out=100)
+plot(x, pnorm(x),type="l",main = "CDFs of Standard Normal and Student's Distributions",xlab = "Value", ylab = "CDF",lwd = 2)
+colors <- terrain.colors(6)
+d_f <- c(1, 3, 5, 10, 50, 100)
+for (i in 1:length(d_f)) {
+    lines(x, pt(x, d_f[i]), col = colors[i],lwd = 1)
+}
+lines(x,pnorm(x),lwd = 2)
+legend("topleft", legend = c("Normal", paste("df=", d_f, sep = "")), col = c("black", colors), lty = 1)
+```
+We observe that with increasing degrees of freedom, Student's distributions converge towards the standard normal distribution. Especially for $df = 50$ and $df=100$, we notice that Student's distributions closely approximate the distribution of $N(0,1)$. In contrast, the graph for $df=1$ shows the greatest difference from the normal distribution -- which is easily observed in the tails. 
+
+Now, let's draw a graph with cdfs of the standard normal distribution and the standardized chi-square distribution with the same degrees of freedom. The standardization is of the form
+$$T = \frac{\chi^2_{df}-df}{\sqrt{2df}}.$$
+
+```{r echo=FALSE}
+x1 = x
+
+stand_chisq <- function(x, df) {
+  sqrt(2*df)*x+df
+}
+
+plot(x1, pnorm(x1), type = 'l', col = 'black',main = "CDFs of Standard Normal and Standardized Chi-Sq Distributions",xlab = "Value", ylab = "CDF")
+
+for (i in 1:length(d_f)) {
+    df <- d_f[i]
+    lines(x, pchisq(stand_chisq(x, df), df), col = colors[i])
+}
+lines(x,pnorm(x),lwd = 2)
+legend("bottomright", legend = c("Normal", paste("Chi-sq", d_f, sep = "")), col = c("black", colors), lty = 1)
+
+```
+
+With increasing degrees of freedom, the standardized chi-square distribution more closely approximates the standard normal distribution, especially evident in the tails, contrasting with the Student's distribution which aligns more in the center. The chi-square distribution with 100 degrees of freedom nearly coincides with the normal distribution.

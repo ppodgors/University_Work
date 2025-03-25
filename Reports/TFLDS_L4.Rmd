@@ -1,0 +1,368 @@
+---
+title: "Theoretical Foundations of Large Data Sets"
+subtitle: "List 4"
+author: "Paulina Podgórska"
+output: pdf_document
+---
+
+# 1. Low dimentional setting
+
+In this task we will analyze a low dimensional setup $n=20$ in three cases:
+
+1.  $\mu_1=1.2\sqrt{2\text{ log }n}, \mu_2=...=\mu_n=0,$
+2.  $\mu_1=...=\mu_5=1.02\sqrt{2\text{ log }\frac{n}{10}},\mu_6=..=\mu_n = 0,$
+3.  $\mu_i = \sqrt{2\text{ log }\frac{20}{i}}, i=1,...10,\mu_{11}=...=\mu_n=0.$
+
+We will compare FWER, FDR and Power of the following procedures:
+
+-   Bonferroni,
+-   Sidak's procedure with $a_n=1-(1-\alpha)^{\frac{1}{n}}$,
+-   Holm,
+-   Hochberg,
+-   Benjamini-Hochberg.
+
+```{r echo=FALSE}
+library(knitr)
+n = 20
+rep = 1000
+true = c(1,5,10)
+FDR_all = matrix(NA,nrow=3,ncol=5)
+PWR_all = matrix(NA,nrow=3,ncol=5)
+FWER_all = matrix(NA,nrow=3,ncol=5)
+for(j in 1:3){
+  PWR = matrix(NA, nrow = rep, ncol=5)
+  FWER =matrix(NA, nrow = rep, ncol=5) 
+  FDP = matrix(NA, nrow = rep, ncol=5)
+  for(r in 1:rep){
+  x1 = c(rnorm(1, 1.2*sqrt(2*log(n)), 1), rnorm(n-1, 0, 1))
+  x2 = c(rnorm(5, 1.02*sqrt(2*log(n/10)), 1), rnorm(n-5, 0, 1))
+  x3 = c()
+  for(i in 1:10){
+    x3[i] = rnorm(1, sqrt(2*log(20/i)), 1)
+  }
+  x3 = c(x3, rnorm(n-10, 0, 1))
+  x = list(x1,x2,x3)
+  p = 2*(1-pnorm(abs(x[[j]]), 0 , 1))
+  bonf= p<=0.05/n
+  sidak = p<=(1-(1-0.05)^(1/n))
+  p_sorted = sort(p,index.return=TRUE)
+  holm = rep(0,n)
+  holm[p_sorted$ix] =(p_sorted$x<=0.05/(n-(0:(n-1))))
+  hoch = rep(0,n)
+  hoch[p_sorted$ix] = (p_sorted$x<=0.05/(n-(1:n)+1))
+  BH = rep(0,n)
+  BH[p_sorted$ix] = (p_sorted$x<=(0.05*1:n)/n)
+  tests = list(bonf,sidak,holm,hoch,BH)
+  for(i in 1:length(tests)){
+    test = tests[[i]]
+    R = sum(test)
+    V = sum(test[(true[j]+1):length(test)]) #FD
+    S = sum(test[1:true[j]]) #TD
+    FDP[r,i] = ifelse(R>=1,V/R,0)
+    PWR[r,i] = S/(true[j])
+    FWER[r,i] = ifelse(V>=1,1,0)
+    }
+  }
+  FWER_all[j,] = colMeans(FWER)
+  FDR_all[j,] = colMeans(FDP)
+  PWR_all[j,] = colMeans(PWR)
+}
+FWER_all = data.frame(round(FWER_all,3))
+FDR_all = data.frame(round(FDR_all,3))
+PWR_all = data.frame(round(PWR_all,3))
+colnames(FWER_all) = c("Bonferroni","Sidak","Holm","Hochberg","Benjamini-Hochberg")
+rownames(FWER_all) = c("1.","2.","3.")
+colnames(FDR_all) = c("Bonferroni","Sidak","Holm","Hochberg","Benjamini-Hochberg")
+rownames(FDR_all) = c("1.","2.","3.")
+colnames(PWR_all) = c("Bonferroni","Sidak","Holm","Hochberg","Benjamini-Hochberg")
+rownames(PWR_all) = c("1.","2.","3.")
+kable(PWR_all, caption="Power")
+kable(FWER_all, caption="FWER")
+kable(FDR_all, caption="FDR")
+```
+From our analysis, it is clear that Bonferroni, Sidak, Holm and Hochberg methods control FWER at the nominal level $\alpha = 0.05$, just as we saw in our lectures. These methods achieve nearly identical values for all considered statistics in all three cases, although it is notable that Sidak seems to be slightly less conservative. We observe that the Benjamini-Hochberg procedure controls the False Discovery Rate. Moreover, it consistently achieves the highest power in all three scenarios, although with the cost of higher FWER and FDR. Generally, all tests perform the best in the 'needle in the haystack' problem. We also notice that again, as discussed in lecture, in every case FDR is lower than FWER, which balances the rate of false discoveries and the ability to detect true effects.
+
+# 2. Large dimensional setup
+
+Now, let us experiment with the number of hypothesis. We will see how the number of hypothesis influences the FWER, FDR and power of the procedures. Let us consider a large dimensional setup $n=5000$ in four cases:
+
+1.  $\mu_1=1.2\sqrt{2\text{ log }n}, \mu_2=...=\mu_n=0,$
+2.  $\mu_1=...=\mu_{100}=1.02\sqrt{2\text{ log }\frac{n}{200}},\mu_{101}=..=\mu_n = 0,$
+3.  $\mu_1=...=\mu_{100}=\sqrt{2\text{ log }\frac{n}{200}},\mu_{101}=..=\mu_n = 0,$
+4.  $\mu_1=...=\mu_{1000}=1.002\sqrt{2\text{ log }\frac{n}{2000}},\mu_{1001}=..=\mu_n = 0.$
+
+```{r echo=FALSE}
+library(knitr)
+n = 5000
+rep = 1000
+true = c(1,100,100,1000)
+FDR_all = matrix(NA,nrow=4,ncol=5)
+PWR_all = matrix(NA,nrow=4,ncol=5)
+FWER_all = matrix(NA,nrow=4,ncol=5)
+for(j in 1:4){
+  PWR = matrix(NA, nrow = rep, ncol=5)
+  FWER =matrix(NA, nrow = rep, ncol=5) 
+  FDP = matrix(NA, nrow = rep, ncol=5)
+  for(r in 1:rep){
+    x1 = c(rnorm(1, 1.2*sqrt(2*log(n)), 1), rnorm(n-1, 0, 1))
+    x2 = c(rnorm(100, 1.02*sqrt(2*log(n/200)), 1), rnorm(n-100, 0, 1))
+    x3 = c(rnorm(100, sqrt(2*log(n/200)), 1), rnorm(n-100, 0, 1))
+    x4 = c(rnorm(1000, 1.002*sqrt(2*log(n/2000)), 1), rnorm(n-1000, 0, 1))
+    x = list(x1,x2,x3,x4)
+    p = 2*(1-pnorm(abs(x[[j]]), 0 , 1))
+    bonf= p<=0.05/n
+    sidak = p<=(1-(1-0.05)^(1/n))
+    p_sorted = sort(p,index.return=TRUE)
+    holm = rep(0,n)
+    holm[p_sorted$ix] =(p_sorted$x<=0.05/(n-(0:(n-1))))
+    hoch = rep(0,n)
+    hoch[p_sorted$ix] = (p_sorted$x<=0.05/(n-(1:n)+1))
+    BH = rep(0,n)
+    BH[p_sorted$ix] = (p_sorted$x<=(0.05*1:n)/n)
+    tests = list(bonf,sidak,holm,hoch,BH)
+    for(i in 1:length(tests)){
+      test = tests[[i]]
+      R = sum(test)
+      V = sum(test[(true[j]+1):length(test)]) #FD
+      S = sum(test[1:true[j]]) #TD
+      FDP[r,i] = ifelse(R>=1,V/R,0)
+      PWR[r,i] = S/(true[j])
+      FWER[r,i] = ifelse(V>=1,1,0)
+      }
+    }
+  FWER_all[j,] = colMeans(FWER)
+  FDR_all[j,] = colMeans(FDP)
+  PWR_all[j,] = colMeans(PWR)
+}
+FWER_all = data.frame(round(FWER_all,3))
+FDR_all = data.frame(round(FDR_all,3))
+PWR_all = data.frame(round(PWR_all,3))
+colnames(FWER_all) = c("Bonferroni","Sidak","Holm","Hochberg","Benjamini-Hochberg")
+rownames(FWER_all) = c("1.","2.","3.","4.")
+colnames(FDR_all) = c("Bonferroni","Sidak","Holm","Hochberg","Benjamini-Hochberg")
+rownames(FDR_all) = c("1.","2.","3.","4.")
+colnames(PWR_all) = c("Bonferroni","Sidak","Holm","Hochberg","Benjamini-Hochberg")
+rownames(PWR_all) = c("1.","2.","3.","4.")
+kable(PWR_all, caption="Power")
+kable(FWER_all, caption="FWER")
+kable(FDR_all, caption="FDR")
+```
+
+We can see that with increased number of hypothesis, all tests achieve significantly greater power in the needle in the haystack scenario. We also observe that all test fail in the forth scenario, which represents the many small effects case. Beyond this, similar conclusions to the first task can be drawn.
+
+In low-dimensional settings, we might be more interested in controlling FWER.Doing so might be important, because with a smaller number of hypothesis, there's a higher chance that even one false positive might significantly impact the overall results. Also, with smaller number of hypothesis, it is very likely that each test is of high importance.
+
+In high-dimensional settings, controlling FWER might be too conservative, potentially leading to the loss of important information and power, making it difficult to detect any significant results. Controlling FDR might be more interesting, as it allows a small proportion of false positives while increasing the ability to detect true discoveries.
+
+# 3. Two-step Fisher procedure
+
+Now, let us apply the two-step Fisher procedure using Bonferroni and chi-square test for the first step in the following cases $n\in \{20,5000\}$ and
+
+1.  $\mu_1=1.2\sqrt{2\text{ log }n}, \mu_2=...=\mu_n=0,$
+2.  $\mu_1=...=\mu_{5}=1.02\sqrt{2\text{ log }\frac{n}{10}},\mu_{6}=..=\mu_n = 0,$
+3.  $\mu_i = \sqrt{2\text{ log }\frac{20}{i}}, i=1,...10,\mu_{11}=...=\mu_n=0,$
+4.  $\mu_1=...=\mu_{1000}=1.002\sqrt{2\text{ log }\frac{n}{2000}},\mu_{1001}=..=\mu_n = 0.$
+
+Then, in order to analyze the differences we will compare FWER (in the strong sense), FWER (in the weak sense), FDR and Power. Results are shown below.
+
+```{r echo=FALSE}
+library(knitr)
+all_n = c(20,5000)
+rep = 1000
+true = c(1,5,10,1000)
+rowname = c("1.","2.","3.","4.")
+n=20
+nr=3
+FDR_all = matrix(NA,nrow=nr,ncol=2)
+PWR_all = matrix(NA,nrow=nr,ncol=2)
+FWERw_all = matrix(NA,nrow=nr,ncol=2)
+FWERs_all = matrix(NA,nrow=nr,ncol=2)
+for(j in 1:3){
+  PWR = matrix(NA, nrow = rep, ncol=2)
+  FWERw =matrix(NA, nrow = rep, ncol=2) 
+  FWERs =matrix(NA, nrow = rep, ncol=2) 
+  FDP = matrix(NA, nrow = rep, ncol=2)
+  for(r in 1:rep){
+    x1 = c(rnorm(1, 1.2*sqrt(2*log(n)), 1), rnorm(n-1, 0, 1))
+    x2 = c(rnorm(5, 1.02*sqrt(2*log(n/10)), 1), rnorm(n-5, 0, 1))
+    x3 = c()
+    for(i in 1:10){
+      x3[i] = rnorm(1, sqrt(2*log(20/i)), 1)}
+    x3 = c(x3, rnorm(n-10, 0, 1))
+    if(n==5000){
+      x4 = c(rnorm(1000, 1.002*sqrt(2*log(n/2000)), 1), rnorm(n-1000, 0, 1)) 
+      x = list(x1,x2,x3,x4)
+    }else{x = list(x1,x2,x3)}
+    x0 = rnorm(n)
+    p = 2*(1-pnorm(abs(x[[j]])))
+    p0 = 2*(1-pnorm(abs(x0)))
+    V_bonf= ifelse(min(p)<=0.05/n,sum(p[(true[j]+1):length(p)]<=0.05),0)#fd
+    V_bonf0 = ifelse(min(p0)<0.05/n,sum(p0<=0.05),0)
+    FWERw[r,1] = ifelse(V_bonf0>=1,1,0)
+    FWERs[r,1] = ifelse(V_bonf>=1,1,0)
+    S_bonf = ifelse(min(p)<=0.05/n,sum(p[1:true[j]]<=0.05),0) #td
+    R_bonf = V_bonf + S_bonf
+    FDP[r,1] = ifelse(R_bonf>=1,V_bonf/R_bonf,0)
+    PWR[r,1] = S_bonf/true[j]
+    
+    #chisq
+    V_chisq= ifelse(sum(x[[j]]^2)>qchisq(1-0.05,n),sum(p[(true[j]+1):length(p)]<=0.05),0)#fd
+    V_chisq0 = ifelse(sum(x0^2)>qchisq(1-0.05,n),sum(p0<=0.05),0)
+    FWERw[r,2] = ifelse(V_chisq0>=1,1,0)
+    FWERs[r,2] = ifelse(V_chisq>=1,1,0)
+    S_chisq = ifelse((sum(x[[j]]^2)>qchisq(1-0.05,n)),sum(p[1:true[j]]<=0.05),0) #td
+    R_chisq= V_chisq + S_chisq
+    FDP[r,2] = ifelse(R_chisq>=1,V_chisq/R_chisq,0)
+    PWR[r,2] = S_chisq/true[j]
+    }
+  FWERs_all[j,] = colMeans(FWERs)
+  FWERw_all[j,] = colMeans(FWERw)
+  FDR_all[j,] = colMeans(FDP)
+  PWR_all[j,] = colMeans(PWR)
+}
+FWERs_all1 = data.frame(round(FWERs_all,3))
+FWERw_all1 = data.frame(round(FWERw_all,3))
+FDR_all1 = data.frame(round(FDR_all,3))
+PWR_all1 = data.frame(round(PWR_all,3))
+colnames(FWERs_all1) = c("$FWER_{strong}$ (Bonf.)","$FWER_{strong}$ (chi-sq.)")
+rownames(FWERs_all1) = rowname[1:nr]
+colnames(FWERw_all1) = c("$FWER_{weak}$ (Bonf.)","$FWER_{weak}$ (chi-sq.)")
+rownames(FWERw_all1) = rowname[1:nr]
+colnames(FDR_all1) = c("FDR (Bonf.)","FDR (chi-sq.)")
+rownames(FDR_all1) = rowname[1:nr]
+colnames(PWR_all1) = c("Power (Bonf.)","Power (chi-sq.)")
+rownames(PWR_all1) = rowname[1:nr]
+
+## n =5000
+
+n=5000
+nr=4
+FDR_all = matrix(NA,nrow=nr,ncol=2)
+PWR_all = matrix(NA,nrow=nr,ncol=2)
+FWERw_all = matrix(NA,nrow=nr,ncol=2)
+FWERs_all = matrix(NA,nrow=nr,ncol=2)
+for(j in 1:nr){
+  PWR = matrix(NA, nrow = rep, ncol=2)
+  FWERw =matrix(NA, nrow = rep, ncol=2) 
+  FWERs =matrix(NA, nrow = rep, ncol=2) 
+  FDP = matrix(NA, nrow = rep, ncol=2)
+  for(r in 1:rep){
+    x1 = c(rnorm(1, 1.2*sqrt(2*log(n)), 1), rnorm(n-1, 0, 1))
+    x2 = c(rnorm(5, 1.02*sqrt(2*log(n/10)), 1), rnorm(n-5, 0, 1))
+    x3 = c()
+    for(i in 1:10){
+      x3[i] = rnorm(1, sqrt(2*log(20/i)), 1)}
+    x3 = c(x3, rnorm(n-10))
+    if(n==5000){
+      x4 = c(rnorm(1000, 1.002*sqrt(2*log(n/2000)), 1), rnorm(n-1000, 0, 1)) 
+      x = list(x1,x2,x3,x4)
+    }else{x = list(x1,x2,x3)}
+    x0 = rnorm(n)
+    p = 2*(1-pnorm(abs(x[[j]])))
+    p0 = 2*(1-pnorm(abs(x0)))
+    V_bonf= ifelse(min(p)<=0.05/n,sum(p[(true[j]+1):length(p)]<=0.05),0)#fd
+    V_bonf0 = ifelse(min(p0)<0.05/n,sum(p0<=0.05),0)
+    FWERw[r,1] = ifelse(V_bonf0>=1,1,0)
+    FWERs[r,1] = ifelse(V_bonf>=1,1,0)
+    S_bonf = ifelse(min(p)<=0.05/n,sum(p[1:true[j]]<=0.05),0) #td
+    R_bonf = V_bonf + S_bonf
+    FDP[r,1] = ifelse(R_bonf>=1,V_bonf/R_bonf,0)
+    PWR[r,1] = S_bonf/true[j]
+    
+    #chisq
+    V_chisq= ifelse(sum(x[[j]]^2)>qchisq(1-0.05,n),sum(p[(true[j]+1):length(p)]<=0.05),0)#fd
+    V_chisq0 = ifelse(sum(x0^2)>qchisq(1-0.05,n),sum(p0<=0.05),0)
+    FWERw[r,2] = ifelse(V_chisq0>=1,1,0)
+    FWERs[r,2] = ifelse(V_chisq>=1,1,0)
+    S_chisq = ifelse((sum(x[[j]]^2)>qchisq(1-0.05,n)),sum(p[1:true[j]]<=0.05),0) #td
+    R_chisq= V_chisq + S_chisq
+    FDP[r,2] = ifelse(R_chisq>=1,V_chisq/R_chisq,0)
+    PWR[r,2] = S_chisq/true[j]
+    }
+  FWERs_all[j,] = colMeans(FWERs)
+  FWERw_all[j,] = colMeans(FWERw)
+  FDR_all[j,] = colMeans(FDP)
+  PWR_all[j,] = colMeans(PWR)
+}
+FWERs_all2 = data.frame(round(FWERs_all,3))
+FWERw_all2 = data.frame(round(FWERw_all,3))
+FDR_all2 = data.frame(round(FDR_all,3))
+PWR_all2 = data.frame(round(PWR_all,3))
+colnames(FWERs_all2) = c("$FWER_{strong}$ (Bonf.)","$FWER_{strong}$ (chi-sq.)")
+rownames(FWERs_all2) = rowname[1:nr]
+colnames(FWERw_all2) = c("$FWER_{weak}$ (Bonf.)","$FWER_{weak}$ (chi-sq.)")
+rownames(FWERw_all2) = rowname[1:nr]
+colnames(FDR_all2) = c("FDR (Bonf.)","FDR (chi-sq.)")
+rownames(FDR_all2) = rowname[1:nr]
+colnames(PWR_all2) = c("Power (Bonf.)","Power (chi-sq.)")
+rownames(PWR_all2) = rowname[1:nr]
+df11 = cbind(FWERs_all1,FWERw_all1)
+df12 = cbind(FWERs_all2,FWERw_all2)
+df21 = cbind(FDR_all1,PWR_all1)
+df22 = cbind(FDR_all2,PWR_all2)
+kable(df11, caption="FWER in both senses for n = 20")
+kable(df12, caption="FWER in both senses for n = 5000")
+kable(df21, caption="FDR and Power for n = 20")
+kable(df22, caption="FDR and Power for n = 5000")
+```
+
+For both values of $n$, the Bonferroni method has the biggest power in the first scenario - when facing a needle in the haystack problem, but at the cost of the highest $FWER_{strong}$ and FDR. The power in this case, as expected, gets higher with the increase of $n$. The chi-square test performs the best in the 'many small effects' scenario, achieving the highest power and lowest FDR, yet with the highest $FWER_{strong}$. Both tests show suboptimal performance in the third scenario for the smaller $n$, and in the second scenario for the bigger $n$. We can see that the two-step procedure does not control FWER in the strong sense, as the values are significantly higher than the significance level $\alpha$. However, we observe that in every case, FWER is controlled in a weak sense. We also notice that, as we discussed in the lecture, FDR is smaller than FWER across all scenarios.
+
+# 4. Simulation of trajectories
+
+In our final section, we will simulate 1000 trajectories of the empirical process $$U_n(t)=\sqrt{n}(F_n(t)-t), \hspace{0.5cm} t\in [0,1]$$ and 1000 trajectories of the Brownian bridge $B(t), t\in[0,1]$. Firstly, we will plot 5 trajectories for each of these processes on the same graph.
+
+```{r eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+library(sde)
+n = 5000
+rep = 1000
+t1 = seq(from=0, to=1, 1/n)
+Un_traj = matrix(NA, nrow = length(t1), ncol=rep)
+BB_traj = matrix(NA, nrow = length(t1), ncol=rep)
+for(r in 1:rep){
+  p = runif(n)
+  Un = c()
+  for(ti in t1){
+    Fn = sum(p <= ti)/n
+    Un = c(Un, sqrt(n)*(Fn-ti))
+  }
+  Un_traj[,r] = Un
+  BB_traj[,r] = BBridge(N=n)
+  
+}
+```
+
+```{r eval=FALSE, include=FALSE}
+plot(t1,Un_traj[,1],type='l',ylim=c(min(Un_traj),max(Un_traj)),xlab="t",ylab="Un(t) and B(t)",col="gray33")
+lines(t1, BB_traj[,1],col="slateblue2")
+for(i in 2:5){
+  lines(t1, Un_traj[,i],col='gray33')
+  lines(t1, BB_traj[,i],col="slateblue2")
+}
+abline(h = 0, col = "black", lwd = 2, lty = 2)
+legend("topright",legend=c("Un(t)", "B(t)"),col=c("gray33","slateblue3"), lwd=c(2, 2),cex=0.8) 
+```
+
+![](0000e2.png)
+
+Next, based on our simulations we will estimate the $\alpha$ quantile of the K-S statistics under the null hypothesis as well as $\alpha$ quantile of $T = sup_{t\in[0,1]} |B(t)|$ for $\alpha = 0.8,0.9,0.95$.
+
+```{r eval=FALSE, include=FALSE}
+Un = apply(Un_traj, 1, function(i) return(max(abs(i))))
+BB = apply(BB_traj, 1, function(i) return(max(abs(i))))
+df = data.frame(matrix(NA, nrow = 2, ncol = 3))
+count = 1
+for(alpha in c(0.8,0.9,0.95)){
+  df[1,count] = quantile(Un,alpha)
+  df[2,count] = quantile(BB,alpha)
+  count = count+1
+}
+```
+```{r echo=FALSE}
+df = data.frame("1"=c(1.655,1.796, 1.867),"2"=c(1.641, 1.717,1.756))
+df = t(df)
+colnames(df) = c("$\\alpha = 0.8$","$\\alpha = 0.9$","$\\alpha = 0.95$")
+rownames(df) = c("K-S","T")
+kable(df,caption="Estimated quantiles of our statistics")
+```
+The estimated quantiles for both statistics increase with the significance level, aligning with the principle that the higher confidence levels correspond to larger critical values. We know that $$KS = sup_{t\in [0,1]}\sqrt{n}(\hat{F}_n(t)-t) \rightarrow sup_{t\in[0,1]}B(t),$$ which is reflected in the similarity of the quantiles for both K-S and T statistics observed in the table. 

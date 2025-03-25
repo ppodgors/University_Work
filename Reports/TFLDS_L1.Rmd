@@ -1,0 +1,433 @@
+---
+title: "Theoretical Foundations of Large Data Sets"
+subtitle: "List 1"
+author: "Paulina Podgórska"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+------------------------------------------------------------------------
+
+Let $X_1,...,X_n$ be the simple random sample from the beta distribution $\beta(\alpha+1,1)$ with the density $f(x,\alpha) = (\alpha + 1) x^\alpha$, for $x \in (0,1)$, $\alpha >-1$.
+
+# Maximum likelihood estimator
+
+Let us find the maximum likelihood estimator $\hat{\alpha}_{MLE}$ of the parameter $\alpha$. The likelihood function is given by
+
+$$L(\alpha, x) = \prod\limits_{i=1}^n(1+\alpha)x_i^\alpha.$$
+
+From this, we obtain the log-likelihood function as
+
+$$logL(\alpha,x) = l(\alpha,x) = nlog(1+\alpha)+\alpha \sum\limits_{i=1}^n log x_i.$$ 
+The maximum likelihood estimator can be found using the following relation: 
+$$\hat{\alpha} = argmax_{\alpha} L(\alpha,x) \Leftrightarrow max_{\alpha} L(\alpha,x) = L(\hat{\alpha},x).$$ Taking the derivative with respect to $\alpha$ and setting it to zero, we have 
+$$\frac{\partial l}{\partial \alpha} = \frac{n}{1+\alpha} + \sum\limits_{i=1}^n log x_i = 0,$$ from which the MLE for $\alpha$ is $$\hat{\alpha}_{MLE} = -\frac{n}{\sum\limits_{i=1}^nlog(x_i)}-1.$$
+In the last step we need to check if the estimator truly corresponds to a maximum in the log-likelihood function. To do that we need to inspect the second derivative of $logL(\alpha,x)$:
+
+$$\frac{\partial l}{\partial \alpha^2} = -\frac{n}{(1+\alpha)^2} \overset{\alpha=\hat{\alpha}}{=}-\frac{n}{(1+\hat{\alpha})^2}.$$
+The above value is smaller than zero because $\alpha>-1$.
+
+# Fisher Information and the asymptotic distribution
+
+Let's calculate the Fisher information for the parameter $\alpha$.
+
+$$log f(x, \alpha) = log(\alpha +1) + \alpha log(x)$$ $$\frac{\partial log f(x, \alpha)}{\partial \alpha} = \frac{1}{\alpha+1} + log(x)$$ $$\frac{\partial^2 log f(x, \alpha)}{\partial \alpha^2} = -\frac{1}{(\alpha+1)^2}$$ $$I(\alpha) = - E\frac{\partial^2 log f(x, \alpha)}{\partial \alpha^2} = \frac{1}{(\alpha+1)^2}$$ Now let us find the asymptotic distribution of the MLE estimator. We know that $$\sqrt{n}(\hat{\alpha}_n - \alpha)\overset{D}{\rightarrow} N(0,\frac{1}{I(\alpha)}),$$ from which we can obtain
+
+$$(\hat{\alpha}_n - \alpha)\overset{D}{\rightarrow} N(0,\frac{1}{nI(\alpha)})$$ Ultimately we get $$\hat{\alpha}_n \overset{D}{\rightarrow} N(\alpha,\frac{(\alpha+1)^2}{n})$$ Knowing the distribution of $\hat{\alpha}_{MLE}$ we can determine the MSE of this estimator:
+
+$$MSE(\hat{\alpha}) = Var(\hat{\alpha})+\left( bias(\hat{\alpha})\right )^2= \frac{(\alpha+1)^2}{n} + \alpha - \alpha = \frac{(\alpha+1)^2}{n}$$ 
+
+# The moment estimator $\hat{\alpha}_{mom}$ 
+
+Given that our distribution follows $\beta(\alpha +1,1)$ the expected value for this distribution is given by: $$E(X) = \frac{\alpha}{\alpha+\beta}.$$
+
+So, for our specific distribution: $$\mu_1 = EX = \frac{\alpha+1}{\alpha+2}.$$
+
+The estimate of $\mu_1$ is:
+
+$$\mu_1 \rightarrow \hat{\mu_1} = \frac{1}{n}\sum\limits_{i=1}^n X_i$$ 
+
+Using the method of moments, we have: $$\hat{\mu}_1 = \frac{\hat{\alpha}_{mom}+1}{\hat{\alpha}_{mom}+2}$$ Upon solving for $\hat{\alpha}_{mom}$ we obtain:
+
+$$\hat{\alpha}_{mom} = \frac{1 - 2\hat{\mu_1}}{\hat{\mu}_1-1}.$$
+
+# Calculating estimators, bias and MSE
+
+Next, we will calculate estimators $\hat{\alpha}_{MLE}$ and $\hat{\alpha}_{mom}$ as well as bias ($\alpha -\hat{\alpha}$) and MSE $(\alpha-\alpha)^2$ with fixed $\alpha=5$ and $n=20$.
+
+```{r echo=FALSE}
+library("knitr")
+alpha = 5
+n = 20
+set.seed(123)
+X = rbeta(n, alpha+1, 1)
+alpha_mle = -(n/sum(log(X)))-1
+
+alpha_mom = (1-2*mean(X))/(mean(X)-1)
+
+bias_mle = alpha - alpha_mle
+mse_mle = (alpha-alpha_mle)^2
+
+bias_mom = alpha-alpha_mom
+mse_mom = (alpha-alpha_mom)^2
+df1 = data.frame(round(cbind(alpha_mle, alpha_mom, bias_mle,bias_mom, mse_mle,mse_mom),3))
+colnames(df1) = c("$\\hat{\\alpha}_{MLE}$", "$\\hat{\\alpha}_{mom}$", "$\\alpha - \\hat{\\alpha}_{MLE}$","$\\alpha - \\hat{\\alpha}_{mom}$","$(\\alpha - \\hat{\\alpha}_{MLE})^2$","$(\\alpha - \\hat{\\alpha}_{mom})^2$")
+
+kable(df1,caption="Values of estimators, bias and MSE")
+```
+
+We can notice, that although the difference is not significant -- MLE estimator is more accurate.
+
+# 1000 samples, n = 20
+
+To better verify above assumption let us generate 1000 samples of the size $n=20$. Firstly we will compare a few plots for both estimators
+
+## Plots for the maximum likelihood estimator $\hat{\alpha}_{MLE}$
+
+```{r fig.height=3, message=FALSE, warning=FALSE}
+library(latex2exp)
+k = 1000
+X_e = replicate(k, rbeta(n, alpha+1, 1))
+alpha_mle = -(n/colSums(log(X_e)))-1
+alpha_mom = (1-2*colMeans(X_e))/(colMeans(X_e)-1)
+# i
+par(mfrow=c(1,3))
+hist(alpha_mle,freq = FALSE, xlab  = TeX("$\\hat{\\alpha}_{MLE}$"),col="snow2",xlim=c(0,12),border="snow4",main="")
+curve(dnorm(x,mean(alpha_mle), sd(alpha_mle)), add=TRUE, col="red")
+boxplot(alpha_mle, main = "",col="snow2")
+qqnorm(alpha_mle,main="")
+qqline(alpha_mle, col="red")
+```
+
+## Plots for the moment estimator $\hat{\alpha}_{mom}$
+
+```{r fig.height=3, message=FALSE, warning=FALSE}
+par(mfrow=c(1,3))
+hist(alpha_mom,freq = FALSE,xlab = TeX("$\\hat{\\alpha}_{mom}$"),col="snow2",xlim=c(0,12),border="snow4",main="")
+curve(dnorm(x,mean(alpha_mom), sd(alpha_mom)), add=TRUE, col="red")
+boxplot(alpha_mom, main = "",col="snow2")
+qqnorm(alpha_mom,main="")
+qqline(alpha_mom, col="red")
+```
+
+The plots for both estimators are nearly identical. From the histograms and box plots, we can observe that their distributions closely resemble each other. Most frequently, the values we obtained for both estimators lie between 4 and 5. The median for both is around 5:
+
+```{r echo=TRUE}
+median(alpha_mle)
+median(alpha_mom)
+```
+
+It seems that, with $\alpha=5$ and $n=20$ both estimation methods perform very well and we cannot determine a significant difference between them.
+
+## Estimation of the bias, the variance and MSE of both estimators
+
+Next, we will estimate the bias, the variance and mean-squared error of both estimators. We will also construct $95\%$ confidence intervals for these parameters.
+
+```{r}
+#ii
+bias_hat_mle = mean(alpha_mle - alpha)
+bias_mle_PU = paste("(", round(bias_hat_mle-qnorm(0.975)*sd(alpha_mle - alpha)/sqrt(k),3), ", ", round(bias_hat_mle+qnorm(0.975)*sd(alpha_mle - alpha)/sqrt(k),3), ")", sep ="")
+#bias_hat_mle +c(1,-1) * qnorm(0.975)*sd(alpha_mle - alpha)/sqrt(k)
+
+bias_hat_mom = mean(alpha_mom - alpha)
+bias_mom_PU = paste("(", round(bias_hat_mom+(-1)*qnorm(0.975)*sd(alpha_mom - alpha)/sqrt(k),3), ", ", round(bias_hat_mom+qnorm(0.975)*sd(alpha_mom - alpha)/sqrt(k),3), ")", sep ="")
+#bias_hat_mom + c(1,-1) * qnorm(0.975)*sd(alpha_mom - alpha)/sqrt(k)
+
+mse_hat_mle = mean((alpha_mle-alpha)^2)
+mse_mle_PU = paste("(", round(mse_hat_mle+(-1)*qnorm(0.975)*sd(alpha_mle - alpha)/sqrt(k),3), ", ", round(mse_hat_mle+qnorm(0.975)*sd(alpha_mle - alpha)/sqrt(k),3), ")", sep ="")
+#mse_hat_mle + c(1,-1) * qnorm(0.975)*sd((alpha_mle-alpha)^2)/sqrt(k)
+
+mse_hat_mom = mean((alpha_mom-alpha)^2)
+mse_mom_PU = paste("(", round(mse_hat_mom+(-1)*qnorm(0.975)*sd(alpha_mom - alpha)/sqrt(k),3), ", ", round(mse_hat_mom+qnorm(0.975)*sd(alpha_mom - alpha)/sqrt(k),3), ")", sep ="")
+#mse_hat_mom + c(1,-1) * qnorm(0.975)*sd((alpha_mom-alpha)^2)/sqrt(k)
+
+var_mle = var(alpha_mle)
+var_mle_pu = paste("(",round((k-1)*var_mle/qchisq(0.975,k-1),3),", ",round((k-1)*var_mle/qchisq(0.025,k-1),3),")",sep="")
+
+var_mom = var(alpha_mom)
+var_mom_pu = paste("(",round((k-1)*var_mom/qchisq(0.975,k-1),3),", ",round((k-1)*var_mom/qchisq(0.025,k-1),3),")",sep="")
+df2 = data.frame(rbind(round(c(bias_hat_mle ,bias_hat_mom, mse_hat_mle,mse_hat_mom,var_mle,var_mom),2),c(bias_mle_PU,bias_mom_PU,mse_mle_PU,mse_mom_PU, var_mle_pu,var_mom_pu)))
+colnames(df2) = c("$bias_{MLE}$","$bias_{mom}$", "$MSE_{MLE}$","$MSE_{mom}$","$var_{MLE}$","$var_{mom}$")
+rownames(df2) = c("Value", "CI")
+kable(df2)
+```
+
+It is difficult to conclusively determine which estimator is better, as the statistics for both are highly similar. We can consider the differences to be minimal.\
+
+Theoretical values:
+```{r}
+dff = data.frame("var" = c((alpha+1)^2/n),"bias" = c(0), "MSE" = c((alpha+1)^2/n))
+colnames(dff) = c("var", "bias","MSE")
+kable(dff, caption="Theoretical values of parameters for $\\hat{\\alpha}_{MLE}$")
+```
+# 1000 samples, n = 200
+
+## Plots for the maximum likelihood estimator $\hat{\alpha}_{MLE}$
+
+```{r fig.height=3, message=FALSE, warning=FALSE}
+library(latex2exp)
+k = 1000
+n=200
+X_e = replicate(k, rbeta(n, alpha+1, 1))
+alpha_mle = -(n/colSums(log(X_e)))-1
+alpha_mom = (1-2*colMeans(X_e))/(colMeans(X_e)-1)
+# i
+par(mfrow=c(1,3))
+hist(alpha_mle,freq = FALSE, xlab  = TeX("$\\hat{\\alpha}_{MLE}$"),col="snow2",xlim=c(0,12),border="snow4",main="")
+curve(dnorm(x,mean(alpha_mle), sd(alpha_mle)), add=TRUE, col="red")
+boxplot(alpha_mle, main = "",col="snow2")
+qqnorm(alpha_mle,main="")
+qqline(alpha_mle, col="red")
+```
+
+## Plots for the moment estimator $\hat{\alpha}_{mom}$
+
+```{r fig.height=3, message=FALSE, warning=FALSE}
+par(mfrow=c(1,3))
+hist(alpha_mom,freq = FALSE,xlab = TeX("$\\hat{\\alpha}_{mom}$"),col="snow2",xlim=c(0,12),border="snow4",main="")
+curve(dnorm(x,mean(alpha_mom), sd(alpha_mom)), add=TRUE, col="red")
+boxplot(alpha_mom, main = "",col="snow2")
+qqnorm(alpha_mom,main="")
+qqline(alpha_mom, col="red")
+```
+
+As we increase $n$ to 200, we observe that both estimators improve, closely approximating the actual value of $\alpha=5$. The number of outliers is reduced, as seen on the box plots and qq-plots. The majority of the values for the estimators fall between 4 and 6. Once again, the differences between $\hat{\alpha}_{MLE}$ and $\hat{\alpha}_{mom}$ are minimal. The histograms are considerably narrower, and the medians are closer to 5 compared to when $n=20$:
+
+```{r echo=TRUE}
+median(alpha_mle)
+median(alpha_mom)
+```
+
+## Estimation of the bias, the variance and MSE of both estimators
+
+```{r}
+#ii
+bias_hat_mle = mean(alpha_mle - alpha)
+bias_mle_PU = paste("(", round(bias_hat_mle-qnorm(0.975)*sd(alpha_mle - alpha)/sqrt(k),3), ", ", round(bias_hat_mle+qnorm(0.975)*sd(alpha_mle - alpha)/sqrt(k),3), ")", sep ="")
+#bias_hat_mle +c(1,-1) * qnorm(0.975)*sd(alpha_mle - alpha)/sqrt(k)
+
+bias_hat_mom = mean(alpha_mom - alpha)
+bias_mom_PU = paste("(", round(bias_hat_mom+(-1)*qnorm(0.975)*sd(alpha_mom - alpha)/sqrt(k),3), ", ", round(bias_hat_mom+qnorm(0.975)*sd(alpha_mom - alpha)/sqrt(k),3), ")", sep ="")
+#bias_hat_mom + c(1,-1) * qnorm(0.975)*sd(alpha_mom - alpha)/sqrt(k)
+
+mse_hat_mle = mean((alpha_mle-alpha)^2)
+mse_mle_PU = paste("(", round(mse_hat_mle+(-1)*qnorm(0.975)*sd(alpha_mle - alpha)/sqrt(k),3), ", ", round(mse_hat_mle+qnorm(0.975)*sd(alpha_mle - alpha)/sqrt(k),3), ")", sep ="")
+#mse_hat_mle + c(1,-1) * qnorm(0.975)*sd((alpha_mle-alpha)^2)/sqrt(k)
+
+mse_hat_mom = mean((alpha_mom-alpha)^2)
+mse_mom_PU = paste("(", round(mse_hat_mom+(-1)*qnorm(0.975)*sd(alpha_mom - alpha)/sqrt(k),3), ", ", round(mse_hat_mom+qnorm(0.975)*sd(alpha_mom - alpha)/sqrt(k),3), ")", sep ="")
+#mse_hat_mom + c(1,-1) * qnorm(0.975)*sd((alpha_mom-alpha)^2)/sqrt(k)
+
+var_mle = var(alpha_mle)
+var_mle_pu = paste("(",round((k-1)*var_mle/qchisq(0.975,k-1),3),", ",round((k-1)*var_mle/qchisq(0.025,k-1),3),")",sep="")
+
+var_mom = var(alpha_mom)
+var_mom_pu = paste("(",round((k-1)*var_mom/qchisq(0.975,k-1),3),", ",round((k-1)*var_mom/qchisq(0.025,k-1),3),")",sep="")
+df2 = data.frame(rbind(round(c(bias_hat_mle ,bias_hat_mom, mse_hat_mle,mse_hat_mom,var_mle,var_mom),2),c(bias_mle_PU,bias_mom_PU,mse_mle_PU,mse_mom_PU, var_mle_pu,var_mom_pu)))
+colnames(df2) = c("$bias_{MLE}$","$bias_{mom}$", "$MSE_{MLE}$","$MSE_{mom}$","$var_{MLE}$","$var_{mom}$")
+rownames(df2) = c("Value", "CI")
+kable(df2)
+```
+
+Once again, the differences between the two estimation methods are minimal, reinforcing the observation that both approaches perform equivalently well. Specifically, with $n=200$, there's an improvement in the performance of both estimators. The bias, MSE and variance for each estimator are significantly reduced. The confidence intervals associated with these three statistics have also narrowed, indicating greater precision in the estimations. We can conclude that with a larger sample size, both estimation methods deliver results with higher accuracy.
+
+Theoretical values:
+```{r}
+dff = data.frame("var" = c((alpha+1)^2/n),"bias" = c(0), "MSE" = c((alpha+1)^2/n))
+colnames(dff) = c("var", "bias","MSE")
+kable(dff, caption="Theoretical values of parameters for $\\hat{\\alpha}_{MLE}$")
+```
+------------------------------------------------------------------------
+
+\
+
+Now, let us consider a simple random sample $X_1,...,X_n$ from the exponential distribution $Exp(\lambda)$ with the density $f(x,\lambda) = \lambda e^{-\lambda x},$ for $x>0$, $\lambda>0$. Our task is to find the uniformly most powerful test at the level $\alpha=0.05$ for testing the hypothesis $H_0: \lambda = 5$ against $H_1: \lambda = 3$.
+
+# Critical value for the test
+
+Using Neyman - Pearson Theorem, we can provide the formula for the critical value of this test.
+
+The likelihood function is given by: $$L(x,\lambda) = \lambda^n e^{-\lambda \sum\limits_{i=1}^n x_i}.$$ From this, we can determine the likelihood ratio as: $$\frac{L(x, \lambda_1)}{L(x, \lambda_0)} = \frac{3^n e^{-3 \sum\limits_{i=1}^n x_i}}{5^n e^{-5 \sum\limits_{i=1}^n x_i}} = \left ( \frac{3}{5}\right )^n e^{2\sum\limits_{i=1}^n x_i} > k$$ Consequently, this leads to:
+
+$$\sum\limits_{i=1}^n x_i > \frac{1}{2} log\left(\left (\frac{5}{3} \right )^n k  \right ) = k_1,$$ where $k_1$ is the critical value.
+
+Given that $\alpha = 0.05$, we have: $$\alpha = 0.05 = P_{H_0}\left(\sum\limits_{i=1}^n x_i > k_1 \right),$$
+
+and under $H_0$, $X_i \sim Exp(5),$ so $\sum\limits_{i=1}^n X_i \sim \Gamma (n, \frac{1}{5})$.
+
+Ultimately our critical value is expressed as:
+
+$$1-\alpha = 0.95 = \Phi_{\Gamma(n, \frac{1}{5})}(k_1)$$ $$k_1 = \Phi^{-1}_{\Gamma(n,\frac{1}{5})}(0.95).$$
+
+# Power of the test
+
+$$P_{H_1}\left(\sum\limits_{i=1}^n x_i >k_1 \right ) = 1-P_{H_1}\left( \sum\limits_{i=1}^n x_i \leqslant k_1  \right) = 1-\Phi_{\Gamma(n,\frac{1}{3})}(\Phi^{-1}_{\Gamma(n,\frac{1}{5})}(0.95)).$$
+
+# P-value
+
+The formula for the p-value for a given random sample:
+
+$$P_{H_0}\left(\sum\limits_{i=1}^n X_i\geqslant d\right) = 1-\Phi_{\Gamma(n,\frac{1}{5})}(d),$$ where $d = \sum\limits_{i=1}^n x_i$.
+
+Next, for $n=20$, we will generate one random sample from $H_0$ and one random sample from $H_1$ and find the respective p-values.
+
+```{r}
+n = 20
+set.seed(23)
+x0 = rexp(n, 5)
+set.seed(27)
+x1 = rexp(n, 3)
+
+p1 = 1-pgamma(sum(x0), n, scale=0.2)
+p2 = 1-pgamma(sum(x1), n, scale = 0.2)
+```
+
+```{r echo=TRUE}
+p1 # for H0
+p2 # for H1
+```
+
+The observed p-value for the sample drawn from $H_0$ is notably higher, surpassing our significance level of $\alpha = 0.05$ -- the null hypothesis would not be rejected. On the other hand, the sample from $H_1$ is close to zero. In this situation we would reject the null hypothesis, indicating that the $\lambda = 3$.
+
+# Distribution of the p-value when data comes from $H_0$
+
+$$P_{H_0}(p \leqslant x) =^{x \in (0,1)} P_{H_0}\left(1-\Phi_{\Gamma(n,\frac{1}{5})}\left(\sum\limits_{i=1}^n X_i \leqslant x \right) \right) = 1-P_{H_0}\left( \sum\limits_{i=1}^n X_i\leqslant \Phi^{-1}_{\Gamma(n,\frac{1}{5})}(1-x)\right)=$$
+
+$$ = 1-\Phi_{\Gamma(n, \frac{1}{5})}\left( \Phi^{-1} _{\Gamma(n,\frac{1}{5})}(1-x)\right) = 1-(1-x) = x$$
+
+When data comes from $H_0$, the distribution of the p-value is uniform $U(0,1)$.
+
+# 1000 samples with $n=20$
+
+In this step we will generate 1000 samples of the size $n=20$ from $H_0$ and calculate respective p-values.
+
+## Plots
+
+```{r fig.height=4}
+alpha = 0.05
+k = 1000
+n=20
+pvals = replicate(k, 1-pgamma(sum(rexp(n, 5)), n, scale=0.2))
+par(mfrow=c(1,2))
+hist(pvals,probability = TRUE,col="snow2",border="snow4", main ="", xlab = "p - values")
+abline(h = 1, col = "red", lwd = 1)
+qqplot(qunif(ppoints(k)),sort(pvals), xlab = " Theoretical Quantiles", ylab = "Sample Quantiles")
+abline(0, 1, col = "red",lwd=2)
+```
+
+Distribution of out p-values is very close to the theoretical one.
+
+## 95% confidence interval
+
+Let us construct the 95% confidence interval for the type I error in the following way:
+
+$$\hat{p} = \frac{1}{k} \sum\limits_{i=1}^k \mathbb{I}_{p_i<\alpha}$$ With that, the confidence interval can be calculated with:
+
+$$\hat{p} \pm z_{\alpha/2}\sqrt{\frac{\hat{p}(1-\hat{p})}{k}}.$$
+
+```{r}
+p_hat = sum(pvals<alpha)/k
+p_puL = p_hat - qnorm(1-alpha/2)*sqrt(p_hat*(1-p_hat)/k)
+p_puR = p_hat + qnorm(1-alpha/2)*sqrt(p_hat*(1-p_hat)/k)
+```
+
+For our data, the confidence interval is: (`r round(p_puL,3)`, `r round(p_puR,3)`).
+
+# 1000 samples of size $n=20$ for $H_1$
+
+Let us generate 1000 samples of the size $n=20$ from $H_1$ and calculate respective p-values. Then we will compare the distribution of p-values under $H_0$ and under $H_1$.
+
+## Plots
+
+```{r}
+alpha = 0.05
+k = 1000
+n=20
+pvals2 = replicate(k, 1-pgamma(sum(rexp(n, 3)), n, scale=0.2))
+par(mfrow=c(1,2))
+hist(pvals2,probability = TRUE,col="snow2",border="snow4", main ="", xlab = "p - values")
+abline(h = 1, col = "red", lwd = 1)
+qqplot(qunif(ppoints(k)),sort(pvals2),xlab = " Theoretical Quantiles", ylab = "Sample Quantiles")
+abline(0, 1, col = "red",lwd=2)
+```
+
+From plots, it's evident that the p-values don't originate from a uniform distribution, unlike in the situation when the data comes from $H_0$. The histogram suggests that most of p-values are below approximately 0.05.
+
+## 95% confidence interval for the power of the test
+
+```{r}
+p_hat2 = sum(pvals2<alpha)/k
+p_puL2 = p_hat2 - qnorm(1-alpha/2)*sqrt(p_hat2*(1-p_hat2)/k)
+p_puR2 = p_hat2 + qnorm(1-alpha/2)*sqrt(p_hat2*(1-p_hat2)/k)
+```
+
+```{r}
+pwr <- 1 - pgamma(qgamma(0.95, n, scale=0.2),n, scale=1/3)
+```
+
+Based on our simulations, the 95% confidence interval for the test's power is (`r round(p_puL2,3)`, `r round(p_puR2,3)`). The theoretical power for this test is `r round(pwr,3)`. The confidence interval is narrow and the theoretical value falls within it - our estimation is precise.
+
+# Comparison with $n=200$
+
+## Samples from $H_0$ -- p - values
+
+### Plots
+
+```{r fig.height=4}
+alpha = 0.05
+k = 1000
+n=200
+pvals = replicate(k, 1-pgamma(sum(rexp(n, 5)), n, scale=0.2))
+par(mfrow=c(1,2))
+hist(pvals,probability = TRUE,col="snow2",border="snow4", main ="", xlab = "p - values")
+abline(h = 1, col = "red", lwd = 1)
+qqplot(qunif(ppoints(k)),sort(pvals),xlab = " Theoretical Quantiles", ylab = "Sample Quantiles")
+abline(0, 1, col = "red",lwd=2)
+```
+
+### 95% confidence interval
+
+```{r}
+p_hat = sum(pvals<alpha)/k
+p_puL = p_hat - qnorm(1-alpha/2)*sqrt(p_hat*(1-p_hat)/k)
+p_puR = p_hat + qnorm(1-alpha/2)*sqrt(p_hat*(1-p_hat)/k)
+```
+
+For our data, the confidence interval is: (`r round(p_puL,3)`, `r round(p_puR,3)`).
+
+There isn't a significant difference in the plots or confidence intervals between $n=20$ and $n=200$. We can conclude that increasing $n$ doesn't substantially impact the p-values when data is drawn from $H_0$.
+
+## 1000 samples of size $n=200$ for $H_1$
+
+### Plots
+
+```{r fig.height=4}
+alpha = 0.05
+k = 1000
+n=200
+pvals2 = replicate(k, 1-pgamma(sum(rexp(n, 3)), n, scale=0.2))
+par(mfrow=c(1,2))
+hist(pvals2,probability = TRUE,col="snow2",border="snow4", main ="", xlab = "p - values")
+abline(h = 1, col = "red", lwd = 1)
+qqplot(qunif(ppoints(k)),sort(pvals2),xlab = " Theoretical Quantiles", ylab = "Sample Quantiles")
+abline(0, 1, col = "red",lwd=2)
+```
+
+```{r}
+p_hat2 = sum(pvals2<alpha)/k
+p_puL2 = p_hat2 - qnorm(1-alpha/2)*sqrt(p_hat2*(1-p_hat2)/k)
+p_puR2 = p_hat2 + qnorm(1-alpha/2)*sqrt(p_hat2*(1-p_hat2)/k)
+```
+
+```{r}
+pwr <- 1 - pgamma(qgamma(0.95, n, scale=0.2),n, scale=1/3)
+```
+
+## 95% confidence interval for the power of the test
+
+For our data, the confidence interval is: (`r round(p_puL2,3)`, `r round(p_puR2,3)`). Theoretical value of power: `r round(pwr,3)`.
+
+With the increase in sample size from 20 to 200, we observe that the power of the test reaches 1, indicating perfect sensitivity. Additionally, a vast majority of p-values drawn from $H_1$ are near zero.
